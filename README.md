@@ -8,4 +8,7 @@ AGMod is a mod manager (in early development) compatible with most games.
 - [ ] Exporting presets
 - [ ] Importing presets
 - [ ] Downloading presets from URL or Git
+- [ ] Cli
+- [ ] Tui
+- [ ] Gui
 
