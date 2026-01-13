@@ -1,0 +1,9 @@
+[workspace]
+members = [
+    "agm",
+    "agmcore",
+    "cli",
+    "gui",
+    "tui",
+]
+resolver = "2"

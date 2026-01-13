@@ -1,0 +1,8 @@
+[package]
+name = "gui"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+agmcore = { path = "../agmcore" }
+iced = "0.12.1"
