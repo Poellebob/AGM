@@ -1,9 +1,25 @@
+[package]
+name = "agm"
+version = "0.1.0"
+edition = "2024"
+
 [workspace]
 members = [
-    "agm",
-    "agmcore",
-    "cli",
-    "gui",
-    "tui",
+  "agmcore",
+  "cli",
+  "tui",
+  "gui",
 ]
-resolver = "2"
+
+[dependencies]
+agmcore = { path = "./agmcore" }
+cli     = { path = "./cli", optional = true }
+tui     = { path = "./tui", optional = true }
+gui     = { path = "./gui", optional = true }
+
+[features]
+default = ["cli"]
+cli = ["dep:cli"]
+tui = ["dep:tui", "cli"]
+gui = ["dep:gui", "cli"]
+
