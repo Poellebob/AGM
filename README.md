@@ -29,14 +29,66 @@ cargo build --release --all-features
 
 ## Usage
 
-```bash
-# TUI mode
-./target/release/agm
+### Profile
 
-# GUI mode
-./target/release/agm --gui
+- `agm profile list`
+- `agm profile add <game>`
+- `agm profile edit <game>`
 
-# CLI commands
-./target/release/agm add my-mod
-./target/release/agm list
+### Preset
+
+- `agm preset switch <game> <preset>`
+- `agm preset list #<game>`
+- `agm preset add <game> #list of urls or archives`
+- `agm preset edit <game> <preset>`
+- `agm preset delete <game> <preset>`
+- `agm preset delete <game> -a #--all`
+- `agm preset disable <game>`
+
+
+## Profiles
+
+Profiles are yaml files that define what the games mod stukture looks like.
+
+```yaml
+
+game:
+  name: ExampleGame
+  path: game/
+
+layout:
+  bin:
+    mods:
+      moddir: true
+
+  script:
+    moddir: true
+
 ```
+
+## Preset
+
+```yaml
+
+game: <name of game>
+
+mods:
+- name: some mod
+  url: <url>
+  files:
+  - target: <dir/>
+    point: <dir/>
+
+  - target: <file>
+    point: <dir/>
+
+- name: other mod
+  url: <url>
+  files:
+  - target: <file>
+    point: <dir/>
+
+```
+
+
+doc["mods"][mod_index]["files"][file_index]["target"]

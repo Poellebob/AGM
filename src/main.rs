@@ -10,7 +10,7 @@ fn main() {
         gui::run();
 
         #[cfg(not(feature = "gui"))]
-        eprintln!("GUI feature is not enabled in this binary.");
+        eprintln!("gui feature is not enabled in this binary.");
 
         return;
     } else if arg_count == 1 {
@@ -22,12 +22,11 @@ fn main() {
 
         #[cfg(all(not(feature = "tui"), not(feature = "gui")))]
         {
-            Args::command().print_help().unwrap();
-            println!();
+            cli::run(args);
         }
         return;
     } else {
-        cli::exec(args);
+        cli::run(args);
     }
 }
 
