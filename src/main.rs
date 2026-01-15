@@ -5,6 +5,10 @@ fn main() {
     let args = Args::parse();
     let arg_count = std::env::args_os().len();
 
+    if args.test {
+        agmcore::core_logic();
+    }
+
     if args.gui {
         #[cfg(feature = "gui")]
         gui::run();
