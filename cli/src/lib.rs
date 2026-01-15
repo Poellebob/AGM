@@ -49,6 +49,8 @@ pub enum Preset {
     Add {
         game: String,
 
+        name: String,
+
         sources: Vec<String>,
     },
 
@@ -96,8 +98,8 @@ pub fn run(args: Args) {
                 println!("List presets for game: {}", game);
             }
 
-            Preset::Add { game, sources } => {
-                println!("Add preset for game: {}", game);
+            Preset::Add { game, name, sources } => {
+                println!("Add preset named {} for game: {}",name, game);
                 println!("{}", "Sources:");
                 for src in sources {
                     println!("    - {}", src);

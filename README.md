@@ -39,7 +39,7 @@ cargo build --release --all-features
 
 - `agm preset switch <game> <preset>`
 - `agm preset list #<game>`
-- `agm preset add <game> #list of urls or archives`
+- `agm preset add <game> <name> #list of urls or archives`
 - `agm preset edit <game> <preset>`
 - `agm preset delete <game> <preset>`
 - `agm preset delete <game> -a #--all`
