@@ -57,12 +57,15 @@ game:
   path: game/
 
 layout:
-  bin:
-    mods:
-      moddir: true
+  dir:
+  - name: bin
+    type: dir
+    sub:
+    - name: mods
+      type: moddir
 
-  script:
-    moddir: true
+  - name: scripts
+    type: moddir
 
 ```
 
@@ -89,6 +92,3 @@ mods:
     point: <dir/>
 
 ```
-
-
-doc["mods"][mod_index]["files"][file_index]["target"]
