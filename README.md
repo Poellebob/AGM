@@ -51,7 +51,6 @@ cargo build --release --all-features
 Profiles are yaml files that define what the games mod stukture looks like.
 
 ```yaml
-
 game:
   name: ExampleGame
   path: game/
@@ -66,13 +65,11 @@ layout:
 
   - name: scripts
     type: moddir
-
 ```
 
 ## Preset
 
 ```yaml
-
 game: <name of game>
 
 mods:
@@ -90,5 +87,57 @@ mods:
   files:
   - target: <file>
     point: <dir/>
+```
 
+
+## Storage
+
+
+```tree
+~/
+├── .local/share/agm/
+│   ├── storage/
+│   │   ├── game1/
+│   │   │   ├── modfile
+│   │   │   └── moddir/
+│   │   └── game2/
+│   │       ├── modfile
+│   │       └── modfile
+│   ├── profiles/
+│   │   ├── game1.yaml
+│   │   └── game2.yaml
+│   └── presets/
+│       ├── game1/
+│       │   ├── preset1.yaml
+│       │   └── preset2.yaml
+│       └── game2/
+│           └── preset1.yaml
+└── .config/
+    └── agm.yaml
+```
+
+
+## Config
+
+This normaly should not be touched
+
+```yaml
+profile:
+  minecraft
+  game1
+  game2
+preset:
+- game: minecraft
+  presets:
+    create
+    pp
+- game: game1
+  presets:
+    modpak1
+    modpak2
+    pp
+- game: game2
+  presets:
+    modpak1
+    pp
 ```
