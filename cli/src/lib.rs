@@ -6,6 +6,9 @@ pub struct Args {
     #[arg(long)]
     pub gui: bool,
 
+    #[arg(long)]
+    pub test: bool,
+
     #[command(subcommand)]
     pub command: Option<Command>,
 }
