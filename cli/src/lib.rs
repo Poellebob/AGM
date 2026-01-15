@@ -57,7 +57,7 @@ pub enum Preset {
     Edit {
         game: String,
         preset: String,
-      },
+    },
 
     Delete {
         game: String,
