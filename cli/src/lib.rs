@@ -87,6 +87,10 @@ pub fn run(args: Args) {
             Profile::Edit { game } => {
                 println!("Edit profile for game: {}", game);
             }
+
+            Profile::Remove { game } => {
+                println!("Remove preset for {}", game)
+            }
         },
 
         Some(Command::Preset { cmd }) => match cmd {
@@ -110,7 +114,7 @@ pub fn run(args: Args) {
                 println!("Edit preset '{}' for game '{}'", preset, game);
             }
 
-            Preset::Delete { game, preset, all } => {
+            Preset::Remove { game, preset, all } => {
                 if all {
                     println!("Delete ALL presets for game: {}", game);
                 } else if let Some(preset) = preset {
