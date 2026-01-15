@@ -14,16 +14,16 @@ pub struct Args {
 pub enum Command {
     Profile {
         #[command(subcommand)]
-        cmd: ProfileCmd,
+        cmd: Profile,
     },
     Preset {
         #[command(subcommand)]
-        cmd: PresetCmd,
+        cmd: Preset,
     },
 }
 
 #[derive(Subcommand, Debug)]
-pub enum ProfileCmd {
+pub enum Profile {
     List,
 
     Add {
@@ -36,7 +36,7 @@ pub enum ProfileCmd {
 }
 
 #[derive(Subcommand, Debug)]
-pub enum PresetCmd {
+pub enum Preset {
     Switch {
       game: String,
       preset: String,
@@ -74,29 +74,29 @@ pub enum PresetCmd {
 pub fn run(args: Args) {
     match args.command {
         Some(Command::Profile { cmd }) => match cmd {
-            ProfileCmd::List => {
+            Profile::List => {
                 println!("{}", "List all game profiles");
             }
 
-            ProfileCmd::Add { game } => {
+            Profile::Add { game } => {
                 println!("Add profile for game: {}", game);
             }
 
-            ProfileCmd::Edit { game } => {
+            Profile::Edit { game } => {
                 println!("Edit profile for game: {}", game);
             }
         },
 
         Some(Command::Preset { cmd }) => match cmd {
-            PresetCmd::Switch { game, preset } => {
+            Preset::Switch { game, preset } => {
                 println!("Switch preset for game '{}' to '{}'", game, preset);
             }
 
-            PresetCmd::List { game } => {
+            Preset::List { game } => {
                 println!("List presets for game: {}", game);
             }
 
-            PresetCmd::Add { game, sources } => {
+            Preset::Add { game, sources } => {
                 println!("Add preset for game: {}", game);
                 println!("{}", "Sources:");
                 for src in sources {
@@ -104,11 +104,11 @@ pub fn run(args: Args) {
                 }
             }
 
-            PresetCmd::Edit { game, preset } => {
+            Preset::Edit { game, preset } => {
                 println!("Edit preset '{}' for game '{}'", preset, game);
             }
 
-            PresetCmd::Delete { game, preset, all } => {
+            Preset::Delete { game, preset, all } => {
                 if all {
                     println!("Delete ALL presets for game: {}", game);
                 } else if let Some(preset) = preset {
@@ -118,7 +118,7 @@ pub fn run(args: Args) {
                 }
             }
 
-            PresetCmd::Disable { game } => {
+            Preset::Disable { game } => {
                 println!("Disable presets for game: {}", game);
             }
         },
