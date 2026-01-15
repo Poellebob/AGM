@@ -84,8 +84,8 @@ mods:
 - name: other mod
   url: <url>
   files:
-  - target: <name> # from the profiles section eg. scriptmod or binmod
-    point: <dir/>
+  - target: <dir/>
+    point: <name> # from the profiles section eg. scriptmod or binmod
 ```
 
 
