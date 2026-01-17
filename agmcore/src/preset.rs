@@ -19,7 +19,7 @@ pub struct Mod {
 pub fn get_preset(path: String) {
     let rawFileString = fs::read_to_string(path)
         .expect("Could not read file at {}", path);
-    let preset: Profile = serde_yaml::from_str(rawFileString);
+    let preset: Preset = serde_yaml::from_str(rawFileString);
 
     Ok(preset)
 }

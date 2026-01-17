@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_yaml;
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct Profile {
+pub struct Config {
     pub profile: Vec<String>,
     pub preset: Vec<Preset>,
 }
@@ -38,4 +38,12 @@ pub fn ensure_config_file() -> io::Result<()> {
     }
 
     Ok(())
+}
+
+pub fn load_config(path: String) {
+    let rawFileString = fs::read_to_string(path)
+        .expect("Could not read file at {}", path);
+    let config: Config = serde_yaml::from_str(rawFileString);
+
+    Ok(config)
 }
