@@ -36,6 +36,10 @@ pub enum Profile {
     Edit {
         game: String,
     },
+
+    Remove {
+        game: String,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -62,7 +66,7 @@ pub enum Preset {
         preset: String,
     },
 
-    Delete {
+    Remove {
         game: String,
 
         preset: Option<String>,

@@ -33,8 +33,9 @@ pub enum Type {
 
 pub fn get_profile(path: String) -> Profile {
     let rawFileString = fs::read_to_string(path)
-        .expect("Could not read file at {}", path);
-    let profile: Profile = serde_yaml::from_str(rawFileString);
+        .expect(&format!("Could not read file at {}", &path));
+    let profile: Profile = serde_yaml::from_str(&rawFileString)
+        .expect(&format!("Could not parse profile {}", &path));
 
     Ok(profile)
 }

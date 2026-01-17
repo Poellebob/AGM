@@ -16,10 +16,11 @@ pub struct Mod {
     pub point: String,
 }
 
-pub fn get_preset(path: String) {
+pub fn get_preset(path: String) -> Preset {
     let rawFileString = fs::read_to_string(path)
-        .expect("Could not read file at {}", path);
-    let preset: Preset = serde_yaml::from_str(rawFileString);
+        .expect(&format!("Could not read file at {}", path));
+    let preset: Preset = serde_yaml::from_str(&rawFileString)
+        ,expect(&format!("Could not parse preset {}", path));
 
     Ok(preset)
 }
