@@ -1,6 +1,20 @@
 use std::fs;
 use dirs_next::config_dir;
 use std::io;
+use serde::{Deserialize, Serialize};
+use serde_yaml;
+
+#[derive(Debug, Deserialize, Serialize)]
+pup struct Profile {
+    pup profile: Vec<String>,
+    pup preset: Vec<Preset>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pup struct Preset {
+    pup name: String,
+    pup mods: Vec<String>,
+}
 
 pub fn ensure_config_file() -> io::Result<()> {
     if let Some(mut program_dir) = config_dir() {

@@ -34,6 +34,7 @@ cargo build --release --all-features
 - `agm profile list`
 - `agm profile add <game>`
 - `agm profile edit <game>`
+- `agm profile remove <game>`
 
 ### Preset
 
@@ -41,8 +42,8 @@ cargo build --release --all-features
 - `agm preset list #<game>`
 - `agm preset add <game> <name> #list of urls or archives`
 - `agm preset edit <game> <preset>`
-- `agm preset delete <game> <preset>`
-- `agm preset delete <game> -a #--all`
+- `agm preset remove <game> <preset>`
+- `agm preset remove <game> -a #--all`
 - `agm preset disable <game>`
 
 
@@ -122,14 +123,9 @@ This normaly should not be touched
 
 ```yaml
 profile:
-  minecraft
-  game1
-  game2
+- game1
+- game2
 preset:
-- game: minecraft
-  presets:
-    create
-    pp
 - game: game1
   presets:
     modpak1
