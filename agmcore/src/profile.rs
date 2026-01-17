@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_yaml;
+use std::path::Path;
 use std::fs;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -31,7 +32,7 @@ pub enum Type {
     Moddir,
 }
 
-pub fn get_profile(path: String) -> Profile {
+pub fn get_profile(path: Path) -> Profile {
     let rawFileString = fs::read_to_string(path)
         .expect(&format!("Could not read file at {}", &path));
     let profile: Profile = serde_yaml::from_str(&rawFileString)

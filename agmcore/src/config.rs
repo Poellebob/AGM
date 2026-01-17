@@ -1,5 +1,6 @@
 use std::fs;
-use dirs_next::config_dir;
+use std::path::Path;
+use dirs_next::{config_dir, data_dir};
 use std::io;
 use serde::{Deserialize, Serialize};
 use serde_yaml;
@@ -38,13 +39,107 @@ pub fn ensure_config_file() {
             println!("Config file already exists: {}", config_file.display());
         }
     }
+
+    if let Some(mut data_dir) = data_dir() {
+        data_dir.push("AGM");
+
+        if !data_dir.exists() {
+            fs::create_dir_all(&program_dir)
+                .expect(&format!("Could not create dir at {}", &data_dir.display()));
+            println!("Created program directory: {}", data_dir.display());
+        } else {
+            println!("Program directory already exists: {}", data_dir.display());
+        }
+    }
 }
 
-pub fn load_config(path: String) -> Config {
+pub fn load_config() -> Config {
+    let base = data_dir()
+        .expect("Failed to resolve data directory")
+        .join("agm");
+
+    let profiles_dir = base.join("profiles");
+    let presets_dir = base.join("presets");
+
+    let mut profiles: Vec<String> = Vec::new();
+    let mut presets: Vec<Preset> = Vec::new();
+
+    // -----------------------------
+    // Load profiles/*.yaml
+    // -----------------------------
+    if profiles_dir.exists() {
+        for entry in fs::read_dir(&profiles_dir)
+            .expect("Failed to read profiles directory")
+        {
+            let path = entry
+                .expect("Failed to read profiles directory entry")
+                .path();
+
+            if is_yaml(&path) {
+                let text = fs::read_to_string(&path)
+                    .expect("Failed to read profile file");
+
+                let mut list: Vec<String> = serde_yaml::from_str(&text)
+                    .expect("Failed to parse profile yaml");
+
+                profiles.append(&mut list);
+            }
+        }
+    }
+
+    // -----------------------------
+    // Load presets/<game>/*.yaml
+    // -----------------------------
+    if presets_dir.exists() {
+        for game_dir in fs::read_dir(&presets_dir)
+            .expect("Failed to read presets directory")
+        {
+            let game_path = game_dir
+                .expect("Failed to read preset game directory entry")
+                .path();
+
+            if !game_path.is_dir() {
+                continue;
+            }
+
+            for preset_file in fs::read_dir(&game_path)
+                .expect("Failed to read game preset directory")
+            {
+                let path = preset_file
+                    .expect("Failed to read preset file entry")
+                    .path();
+
+                if is_yaml(&path) {
+                    let text = fs::read_to_string(&path)
+                        .expect("Failed to read preset file");
+
+                    let preset: Preset = serde_yaml::from_str(&text)
+                        .expect("Failed to parse preset yaml");
+
+                    presets.push(preset);
+                }
+            }
+        }
+    }
+
+    Config {
+        profile: profiles,
+        preset: presets,
+    }
+}
+
+fn is_yaml(path: &Path) -> bool {
+    matches!(
+        path.extension().and_then(|s| s.to_str()),
+        Some("yaml") | Some("yml")
+    )
+}
+
+/*pub fn load_config(path: String) -> Config {
     let raw_file_string = fs::read_to_string(&path)
         .expect(&format!("Could not read file at {}", &path));
     let config: Config = serde_yaml::from_str(&raw_file_string)
         .expect("Could not parse config file");
     
     config
-}
+}*/

@@ -95,7 +95,7 @@ mods:
 
 ```tree
 ~/
-├── .local/share/agm/
+├── data-dir/
 │   ├── storage/
 │   │   ├── game1/
 │   │   │   ├── modfile
@@ -112,7 +112,8 @@ mods:
 │       │   └── preset2.yaml
 │       └── game2/
 │           └── preset1.yaml
-└── .config/
+│
+└── config-dir/
     └── agm.yaml
 ```
 
@@ -124,7 +125,7 @@ This normaly should not be touched
 ```yaml
 profile:
 - game1
-- game2
+-  game2
 preset:
 - game: game1
   presets:
