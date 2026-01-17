@@ -56,15 +56,14 @@ game:
   path: game/
 
 layout:
-  dir:
-  - name: bin
-    type: dir
-    sub:
-    - name: mods
-      type: moddir
-
-  - name: scripts
+- name: bin
+  type: dir
+  sub:
+  - name: binmod
     type: moddir
+
+- name: scriptsmod
+  type: moddir
 ```
 
 ## Preset
@@ -85,8 +84,8 @@ mods:
 - name: other mod
   url: <url>
   files:
-  - target: <file>
-    point: <dir/>
+  - target: <dir/>
+    point: <name> # from the profiles section eg. scriptmod or binmod
 ```
 
 
