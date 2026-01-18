@@ -32,11 +32,11 @@ pub enum Type {
     Moddir,
 }
 
-pub fn get_profile(path: Path) -> Profile {
-    let rawFileString = fs::read_to_string(path)
-        .expect(&format!("Could not read file at {}", &path));
-    let profile: Profile = serde_yaml::from_str(&rawFileString)
-        .expect(&format!("Could not parse profile {}", &path));
+pub fn get_profile(path: &Path) -> Profile {
+    let raw_file_string = fs::read_to_string(path)
+        .expect(&format!("Could not read file at {:?}", &path));
+    let profile: Profile = serde_yaml::from_str(&raw_file_string)
+        .expect(&format!("Could not parse profile {:?}", &path));
 
-    Ok(profile)
+    profile
 }

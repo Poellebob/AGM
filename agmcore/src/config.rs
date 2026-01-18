@@ -44,7 +44,7 @@ pub fn ensure_config_file() {
         data_dir.push("AGM");
 
         if !data_dir.exists() {
-            fs::create_dir_all(&program_dir)
+            fs::create_dir_all(&data_dir)
                 .expect(&format!("Could not create dir at {}", &data_dir.display()));
             println!("Created program directory: {}", data_dir.display());
         } else {
