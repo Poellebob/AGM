@@ -5,17 +5,19 @@ edition = "2024"
 
 [workspace]
 members = [
-  "agmcore",
+  "agm-core",
   "cli",
   "tui",
   "gui",
+  "agm-url-handler",
 ]
 
 [dependencies]
-agmcore = { path = "./agmcore" }
+agm_core = { path = "./agm-core" }
 cli     = { path = "./cli", optional = true }
 tui     = { path = "./tui", optional = true }
 gui     = { path = "./gui", optional = true }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 
 [features]
 default = ["cli"]

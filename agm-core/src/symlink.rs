@@ -1,7 +1,7 @@
 use std::path::Path;
 
 #[cfg(target_os = "linux")]
-pub use std::os::unix::fs::symlink as symlink;
+pub use std::os::unix::fs::symlink;
 
 #[cfg(target_os = "windows")]
 pub use std::os::windows::fs::symlink_file as symlink;

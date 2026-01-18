@@ -1,4 +1,6 @@
-pub use clap::{Parser, Subcommand, CommandFactory};
+use agm_core::Agm;
+use agm_core::ipc::{create_url_channel, start_ipc_server};
+pub use clap::{CommandFactory, Parser, Subcommand};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -6,8 +8,13 @@ pub struct Args {
     #[arg(long)]
     pub gui: bool,
 
+    #[cfg(debug_assertions)]
     #[arg(long)]
     pub test: bool,
+
+    #[cfg(debug_assertions)]
+    #[arg(long)]
+    pub test_url_handle: bool,
 
     #[command(subcommand)]
     pub command: Option<Command>,
@@ -29,24 +36,18 @@ pub enum Command {
 pub enum Profile {
     List,
 
-    Add {
-        game: String,
-    },
+    Add { game: String },
 
-    Edit {
-        game: String,
-    },
+    Edit { game: String },
 
-    Remove {
-        game: String,
-    },
+    Remove { game: String },
 }
 
 #[derive(Subcommand, Debug)]
 pub enum Preset {
     Switch {
-      game: String,
-      preset: String,
+        game: String,
+        preset: String,
     },
 
     List {
@@ -80,15 +81,26 @@ pub enum Preset {
     },
 }
 
-pub fn run(args: Args) {
+pub async fn run(args: Args) {
+    #[cfg(debug_assertions)]
+    if args.test_url_handle {
+        println!("Running in test url handle mode.");
+        if let Err(e) = run_url_handler().await {
+            eprintln!("Error running url handler: {}", e);
+        }
+        return;
+    }
+
+    let mut agm = Agm::new();
+
     match args.command {
         Some(Command::Profile { cmd }) => match cmd {
             Profile::List => {
-                println!("{}", "List all game profiles");
+                agm.list_profiles();
             }
 
             Profile::Add { game } => {
-                println!("Add profile for game: {}", game);
+                agm.add_profile(&game);
             }
 
             Profile::Edit { game } => {
@@ -96,7 +108,7 @@ pub fn run(args: Args) {
             }
 
             Profile::Remove { game } => {
-                println!("Remove preset for {}", game)
+                agm.remove_profile(&game);
             }
         },
 
@@ -105,16 +117,16 @@ pub fn run(args: Args) {
                 println!("Switch preset for game '{}' to '{}'", game, preset);
             }
 
-            Preset::List { game } => {
-                println!("List presets for game: {}", game);
+            Preset::List { game: _ } => {
+                agm.list_presets();
             }
 
-            Preset::Add { game, name, sources } => {
-                println!("Add preset named {} for game: {}",name, game);
-                println!("{}", "Sources:");
-                for src in sources {
-                    println!("    - {}", src);
-                }
+            Preset::Add {
+                game: _,
+                name,
+                sources: _,
+            } => {
+                agm.add_preset(&name);
             }
 
             Preset::Edit { game, preset } => {
@@ -125,7 +137,7 @@ pub fn run(args: Args) {
                 if all {
                     println!("Delete ALL presets for game: {}", game);
                 } else if let Some(preset) = preset {
-                    println!("Delete preset '{}' for game '{}'", preset, game);
+                    agm.remove_preset(&preset);
                 } else {
                     eprintln!("{}", "Error: no preset specified and --all not set");
                 }
@@ -140,4 +152,22 @@ pub fn run(args: Args) {
             Args::command().print_help().unwrap();
         }
     }
+}
+
+async fn run_url_handler() -> Result<(), Box<dyn std::error::Error + Send>> {
+    let (url_sender, mut url_receiver) = create_url_channel();
+    let port = 3000;
+
+    let ipc_server_handle = tokio::spawn(start_ipc_server(url_sender, port));
+
+    println!("IPC server started on port {}. Waiting for URLs...", port);
+
+    while let Some(url_message) = url_receiver.recv().await {
+        println!("Received URL: {}", url_message.url);
+    }
+
+    ipc_server_handle
+        .await
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?
+
 }
