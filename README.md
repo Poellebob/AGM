@@ -62,9 +62,11 @@ layout:
   sub:
   - name: binmod
     type: moddir
+    mime: [zip, pkg] # .zip or pkg's go here
 
 - name: scriptsmod
   type: moddir
+  mime: [src, gam]
 ```
 
 ## Preset
@@ -74,19 +76,23 @@ game: <name of game>
 
 mods:
 - name: some mod
-  url: <url>
-  files:
-  - target: <dir/>
-    point: <dir/>
-
-  - target: <file>
-    point: <dir/>
-
 - name: other mod
-  url: <url>
-  files:
-  - target: <dir/>
-    point: <name> # from the profiles section eg. scriptmod or binmod
+```
+
+## Mod spec
+
+```yaml
+name: cool mod
+url: <url>
+files:
+- target: <dir/>
+  point:  "@<name>" # from the profiles section eg. scriptmod or binmod
+
+- target: <dir/>
+  point: <dir/> #with the root being the games dir
+
+- target: <file>
+  point: <dir/>
 ```
 
 
@@ -125,15 +131,22 @@ This normaly should not be touched
 ```yaml
 profile:
 - game1
--  game2
+- game2
 preset:
 - game: game1
+  alias:
+  - G1
+  - Game1
   presets:
     modpak1
     modpak2
     pp
 - game: game2
+  alias:
+  - Ga2
   presets:
     modpak1
     pp
 ```
+
+

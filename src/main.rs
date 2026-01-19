@@ -1,8 +1,9 @@
-#[allow(unused_imports)]
-use cli::{Args, CommandFactory, Parser};
+use cli::{Args, Parser};
+use dotenvy::dotenv;
 
 #[tokio::main]
 async fn main() {
+    dotenv().ok();
     let args = Args::parse();
 
     if args.gui {

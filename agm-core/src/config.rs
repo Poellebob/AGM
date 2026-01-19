@@ -5,8 +5,12 @@ use std::path::PathBuf;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Config {
+    #[serde(default)]
     pub profiles: Vec<String>,
+    #[serde(default)]
     pub presets: Vec<String>,
+    #[serde(default)]
+    pub nexus_api_key: Option<String>,
 }
 
 impl Config {
@@ -14,6 +18,7 @@ impl Config {
         Self {
             profiles: Vec::new(),
             presets: Vec::new(),
+            nexus_api_key: None,
         }
     }
 

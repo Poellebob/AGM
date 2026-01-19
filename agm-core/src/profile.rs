@@ -21,6 +21,7 @@ pub struct Layout {
     #[serde(rename = "type")]
     pub node_type: LayoutType,
     pub sub: Option<Vec<Layout>>,
+    pub mime: Option<Vec<String>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -52,5 +53,43 @@ impl Profile {
 
     pub fn to_yaml(&self) -> String {
         serde_yaml::to_string(self).unwrap()
+    }
+
+    pub fn get_moddir_names(&self) -> Vec<String> {
+        let mut moddir_names = Vec::new();
+        self.collect_moddir_names(&self.layout, &mut moddir_names);
+        moddir_names
+    }
+
+    fn collect_moddir_names(&self, layouts: &[Layout], moddir_names: &mut Vec<String>) {
+        for layout in layouts {
+            if let LayoutType::Moddir = layout.node_type {
+                moddir_names.push(layout.name.clone());
+            }
+            if let Some(sub_layouts) = &layout.sub {
+                self.collect_moddir_names(sub_layouts, moddir_names);
+            }
+        }
+    }
+}
+
+impl Layout {
+    pub fn find_matching_moddir_point(&self, file_extension: &str) -> Option<String> {
+        if let LayoutType::Moddir = self.node_type {
+            if let Some(mimes) = &self.mime {
+                if mimes.iter().any(|m| m == file_extension) {
+                    return Some(format!("@{}", self.name));
+                }
+            }
+        }
+
+        if let Some(sub_layouts) = &self.sub {
+            for sub_layout in sub_layouts {
+                if let Some(point) = sub_layout.find_matching_moddir_point(file_extension) {
+                    return Some(point);
+                }
+            }
+        }
+        None
     }
 }
