@@ -12,8 +12,6 @@ pub struct Preset {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Mod {
     pub name: String,
-    pub target: String,
-    pub point: String,
 }
 
 impl Preset {

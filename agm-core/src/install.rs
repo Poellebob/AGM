@@ -11,6 +11,7 @@ pub trait InstallReporter {
     fn unpacking_start(&self, file_name: &str, dest: &str);
     fn review_placements(&self, mod_name: &str);
     fn prompt_for_point(&self, target: &str, moddirs: &[String]) -> io::Result<String>;
+    fn symlink_created(&self, source: &Path, destination: &Path);
 }
 
 pub async fn install_mods(
@@ -102,6 +103,23 @@ pub async fn install_mods(
                     if file_entry.point.is_empty() {
                         let user_choice = reporter.prompt_for_point(&file_entry.target, &moddir_options)?;
                         file_entry.point = user_choice;
+                    }
+                }
+
+                // Create symlinks
+                let game_path = Path::new(&profile.game.path);
+                for file_entry in &mod_spec.files {
+                    if !file_entry.point.is_empty() {
+                        if let Some(dest_dir_suffix) = profile.resolve_point(&file_entry.point) {
+                            let source_path = storage_path.join(&file_entry.target);
+                            let dest_path = game_path.join(&dest_dir_suffix).join(&file_entry.target);
+
+                            if let Err(e) = crate::symlink::create_symlink(&source_path, &dest_path) {
+                                eprintln!("Failed to create symlink from {} to {}: {}", source_path.display(), dest_path.display(), e);
+                            } else {
+                                reporter.symlink_created(&source_path, &dest_path);
+                            }
+                        }
                     }
                 }
 

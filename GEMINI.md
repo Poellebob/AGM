@@ -6,7 +6,7 @@ AGM is a cross-platform mod manager, currently in early development, aiming to p
 
 The project is a Rust workspace composed of several crates:
 
--   `agm-core`: Contains the core logic, data structures, and foundational utilities for mod management.
+-   `agm-core`: Contains the core logic, data structures, and foundational utilities for mod management. All shared logic that is not specific to a user interface (CLI, TUI, GUI) should reside here to ensure reusability and avoid duplication.
 -   `cli`: Provides the command-line interface for interacting with AGM.
 -   `tui`: Intended for a terminal user interface.
 -   `gui`: Intended for a graphical user interface.
@@ -19,7 +19,7 @@ and nothing to do with to do with mod management so no logic gets written twice.
 
 ### Profiles
 
-*   YAML files defining a game's mod structure, including paths and special "mod directories" (`Moddir`) where mods can be placed.
+*   YAML files defining a game's mod structure, including paths and special "mod directories" (`Moddir`) where mods can be placed. The `path` field in the `game` section should contain the *entire* path to the game's installation directory.
 *   The `agm-core/src/profile.rs` defines the `Profile` struct which reflects this YAML structure.
 
 ### Presets
@@ -49,6 +49,7 @@ and nothing to do with to do with mod management so no logic gets written twice.
 
 *   The core logic for mod installation resides in `agm-core/src/install.rs`.
 *   The `install_mods` function handles unpacking zip files, generating sidecar `ModSpec` YAML files, and guessing file placements based on profile MIME types.
+*   **Symlinking for File Management:** A key aspect of AGM's file management strategy is the use of symlinks. Instead of copying mod files, AGM creates symbolic links from the game's mod directories (determined by the `point`s in the `ModSpec`) to the actual mod files stored in a central location (`~/data-dir/storage/<game_name>/<mod_name>/`). This minimizes file duplication, saves disk space, and allows for near-instantaneous mod activation and deactivation.
 *   UI interaction is abstracted through the `InstallReporter` trait, which is implemented by each frontend (e.g., `CliInstallReporter` in `cli/src/lib.rs`) to handle user prompts.
 
 ## Current Implementation Status

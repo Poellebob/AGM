@@ -2,6 +2,7 @@ use agm_core::ipc::{create_url_channel, start_ipc_server};
 use agm_core::{install::InstallReporter, nexus, Agm};
 pub use clap::{CommandFactory, Parser, Subcommand};
 use std::io::{self, Write};
+use std::path::Path;
 use url::Url;
 
 #[derive(Parser, Debug)]
@@ -57,13 +58,21 @@ pub struct CliConfig {
     /// Set the Nexus Mods API key
     #[arg(long)]
     pub nexus_api_key: Option<String>,
+
+    /// Set the editor to use for editing profiles
+    #[arg(long)]
+    pub editor: Option<String>,
 }
 
 #[derive(Subcommand, Debug)]
 pub enum CliProfile {
     List,
 
-    Add { game: String },
+    Add {
+        game: String,
+        #[arg(long)]
+        name: Option<String>,
+    },
 
     Edit { game: String },
 
@@ -78,33 +87,23 @@ pub enum Preset {
     },
 
     List {
-        game: String,
+        #[arg(long)]
+        profile: Option<String>,
     },
 
     Add {
         game: String,
-
         name: String,
-
-        sources: Vec<String>,
     },
 
     Edit {
         game: String,
-        preset: String,
+        name: String,
     },
 
     Remove {
         game: String,
-
-        preset: Option<String>,
-
-        #[arg(short, long)]
-        all: bool,
-    },
-
-    Disable {
-        game: String,
+        name: String,
     },
 }
 
@@ -117,6 +116,14 @@ impl InstallReporter for CliInstallReporter {
 
     fn review_placements(&self, mod_name: &str) {
         println!("\nReviewing file placements for mod '{}':", mod_name);
+    }
+
+    fn symlink_created(&self, source: &Path, destination: &Path) {
+        println!(
+            "  Created symlink: {} -> {}",
+            destination.display(),
+            source.display()
+        );
     }
 
     fn prompt_for_point(&self, target: &str, moddirs: &[String]) -> io::Result<String> {
@@ -181,53 +188,46 @@ pub async fn run(args: Args) {
             CliProfile::List => {
                 agm.list_profiles();
             }
-
-            CliProfile::Add { game } => {
-                agm.add_profile(&game);
+            CliProfile::Add { game, name } => {
+                if let Err(e) = agm.add_profile(game, name) {
+                    eprintln!("Error adding profile: {}", e);
+                }
             }
-
             CliProfile::Edit { game } => {
-                println!("Edit profile for game: {}", game);
+                if let Err(e) = agm.edit_profile(&game) {
+                    eprintln!("Error editing profile: {}", e);
+                }
             }
-
             CliProfile::Remove { game } => {
-                agm.remove_profile(&game);
+                if let Err(e) = agm.remove_profile(&game) {
+                    eprintln!("Error removing profile: {}", e);
+                }
             }
         },
 
         Some(Command::Preset { cmd }) => match cmd {
             Preset::Switch { game, preset } => {
-                println!("Switch preset for game '{}' to '{}'", game, preset);
-            }
-
-            Preset::List { game: _ } => {
-                agm.list_presets();
-            }
-
-            Preset::Add {
-                game: _,
-                name,
-                sources: _,
-            } => {
-                agm.add_preset(&name);
-            }
-
-            Preset::Edit { game, preset } => {
-                println!("Edit preset '{}' for game '{}'", preset, game);
-            }
-
-            Preset::Remove { game, preset, all } => {
-                if all {
-                    println!("Delete ALL presets for game: {}", game);
-                } else if let Some(preset) = preset {
-                    agm.remove_preset(&preset);
-                } else {
-                    eprintln!("{}", "Error: no preset specified and --all not set");
+                if let Err(e) = agm.switch_preset(&game, &preset) {
+                    eprintln!("Error switching preset: {}", e);
                 }
             }
-
-            Preset::Disable { game } => {
-                println!("Disable presets for game: {}", game);
+            Preset::List { profile } => {
+                agm.list_presets(profile);
+            }
+            Preset::Add { game, name } => {
+                if let Err(e) = agm.add_preset(game, name) {
+                    eprintln!("Error adding preset: {}", e);
+                }
+            }
+            Preset::Edit { game, name } => {
+                if let Err(e) = agm.edit_preset(&game, &name) {
+                    eprintln!("Error editing preset: {}", e);
+                }
+            }
+            Preset::Remove { game, name } => {
+                if let Err(e) = agm.remove_preset(&game, &name) {
+                    eprintln!("Error removing preset: {}", e);
+                }
             }
         },
 
@@ -235,6 +235,9 @@ pub async fn run(args: Args) {
             if let Some(key) = cli_config_cmd.nexus_api_key {
                 agm.set_nexus_api_key(&key);
                 println!("Nexus API key set successfully.");
+            } else if let Some(editor) = cli_config_cmd.editor {
+                agm.set_editor(&editor);
+                println!("Editor set successfully.");
             } else {
                 eprintln!("Error: No configuration option specified.");
             }

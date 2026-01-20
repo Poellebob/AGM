@@ -4,13 +4,26 @@ use std::fs;
 use std::path::PathBuf;
 
 #[derive(Debug, Deserialize, Serialize)]
+pub struct PresetConfig {
+    pub game: String,
+    #[serde(default)]
+    pub aliases: Vec<String>,
+    #[serde(default)]
+    pub presets: Vec<String>,
+    #[serde(default)]
+    pub active_preset: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Config {
     #[serde(default)]
     pub profiles: Vec<String>,
     #[serde(default)]
-    pub presets: Vec<String>,
+    pub presets: Vec<PresetConfig>,
     #[serde(default)]
     pub nexus_api_key: Option<String>,
+    #[serde(default)]
+    pub editor: Option<String>,
 }
 
 impl Config {
@@ -19,6 +32,7 @@ impl Config {
             profiles: Vec::new(),
             presets: Vec::new(),
             nexus_api_key: None,
+            editor: None,
         }
     }
 

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_yaml;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Profile {
@@ -38,7 +38,27 @@ impl Profile {
                 name: name.to_string(),
                 path: path.to_string(),
             },
-            layout: Vec::new(),
+            layout: vec![
+                Layout {
+                    name: "bin".to_string(),
+                    node_type: LayoutType::Dir,
+                    sub: Some(vec![
+                        Layout {
+                            name: "binmod".to_string(),
+                            node_type: LayoutType::Moddir,
+                            sub: None,
+                            mime: Some(vec!["zip".to_string(), "pkg".to_string()]),
+                        },
+                    ]),
+                    mime: None,
+                },
+                Layout {
+                    name: "scriptsmod".to_string(),
+                    node_type: LayoutType::Moddir,
+                    sub: None,
+                    mime: Some(vec!["src".to_string(), "gam".to_string()]),
+                },
+            ],
         }
     }
 
@@ -70,6 +90,37 @@ impl Profile {
                 self.collect_moddir_names(sub_layouts, moddir_names);
             }
         }
+    }
+
+    pub fn resolve_point(&self, point: &str) -> Option<PathBuf> {
+        if point.starts_with('@') {
+            let moddir_name = &point[1..];
+            let mut path = PathBuf::new();
+            self.find_moddir_path(&self.layout, moddir_name, &mut path)
+        } else {
+            Some(PathBuf::from(point))
+        }
+    }
+
+    fn find_moddir_path(&self, layouts: &[Layout], moddir_name: &str, current_path: &mut PathBuf) -> Option<PathBuf> {
+        for layout in layouts {
+            let original_path = current_path.clone();
+            current_path.push(&layout.name);
+
+            if layout.name == moddir_name {
+                if let LayoutType::Moddir = layout.node_type {
+                    return Some(current_path.clone());
+                }
+            }
+
+            if let Some(sub_layouts) = &layout.sub {
+                if let Some(found_path) = self.find_moddir_path(sub_layouts, moddir_name, current_path) {
+                    return Some(found_path);
+                }
+            }
+            *current_path = original_path; // backtrack
+        }
+        None
     }
 }
 

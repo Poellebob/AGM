@@ -1,16 +1,15 @@
+use std::fs;
 use std::path::Path;
 
 #[cfg(target_os = "linux")]
-pub use std::os::unix::fs::symlink;
+use std::os::unix::fs::symlink;
 
 #[cfg(target_os = "windows")]
-pub use std::os::windows::fs::symlink_file as symlink;
+use std::os::windows::fs::symlink_file as symlink;
 
-pub fn link_files(target_files: &[String], point_dir: &Path) {
-    for target_file in target_files {
-        let target_path = Path::new(target_file);
-        let link_path = point_dir.join(target_path.file_name().unwrap());
-
-        symlink(target_path, &link_path).expect("Failed to create symlink");
+pub fn create_symlink(source: &Path, destination: &Path) -> std::io::Result<()> {
+    if let Some(parent) = destination.parent() {
+        fs::create_dir_all(parent)?;
     }
+    symlink(source, destination)
 }

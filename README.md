@@ -3,58 +3,57 @@
 A cross-platform mod manager with CLI, TUI, and GUI interfaces.
 AGM is in very early development and does not have basic features yet.
 
-## Planned features
-- [ ] Game profiles
-- [ ] Add, remove, or disable mods
-- [ ] Game presets
-- [ ] Exporting presets
-- [ ] Importing presets
-- [ ] Downloading presets from URL or Git
-- [ ] Cli
-- [ ] Tui
-- [ ] Gui
+## Features
 
-## Build
+### Configuration
+- `agm config --nexus-api-key <key>`: Sets your Nexus Mods API key.
+- `agm config --editor <command>`: Sets your preferred text editor (e.g., `nano`, `vim`, `code`). The `EDITOR` environment variable is used as a fallback.
 
-```bash
-# TUI (default)
-cargo build --release
+### Profile Management
+- `agm profile list`: Lists all available profiles.
+- `agm profile add <game_name> [--name <profile_name>]`: Creates a new game profile. You'll be prompted for the game's installation path, and the new profile will open in your configured editor.
+- `agm profile edit <profile_name>`: Opens an existing profile in your editor.
+- `agm profile remove <profile_name>`: Deletes a profile and its configuration file.
 
-# GUI
-cargo build --release --features gui
-
-# Both
-cargo build --release --all-features
-```
+### Mod Installation
+- `agm install <path_to_zip> --profile <profile_name>`: Installs a mod from a `.zip` file.
+  - Unpacks the mod into AGM's central storage directory.
+  - Automatically guesses file placements based on `mime` types defined in the profile.
+  - Interactively prompts for placement for any files that could not be automatically placed.
+  - Creates symlinks from the game's directory to the mod files in storage, enabling instant activation.
 
 ## Usage
 
 ### Profile
-
 - `agm profile list`
-- `agm profile add <game>`
-- `agm profile edit <game>`
-- `agm profile remove <game>`
+- `agm profile add <game_name> [--name <profile_name>]`
+- `agm profile edit <profile_name>`
+- `agm profile remove <profile_name>`
 
 ### Preset
-
 - `agm preset switch <game> <preset>`
-- `agm preset list #<game>`
+- `agm preset list [--profile <game>]`
 - `agm preset add <game> <name> #list of urls or archives`
-- `agm preset edit <game> <preset>`
+- `agm preset edit <game> <name>`
 - `agm preset remove <game> <preset>`
 - `agm preset remove <game> -a #--all`
 - `agm preset disable <game>`
 
+### Config
+- `agm config --nexus-api-key <key>`
+- `agm config --editor <command>`
 
-## Profiles
+### Install
+- `agm install <path_to_zip> --profile <profile_name>`
+
+## Profiles | Game spec
 
 Profiles are yaml files that define what the games mod stukture looks like.
 
 ```yaml
 game:
   name: ExampleGame
-  path: game/
+  path: game/  #path to game dir
 
 layout:
 - name: bin
@@ -69,7 +68,7 @@ layout:
   mime: [src, gam]
 ```
 
-## Preset
+## Preset | Mod collection spec (mod pack)
 
 ```yaml
 game: <name of game>
@@ -140,13 +139,11 @@ preset:
   presets:
     modpak1
     modpak2
-    pp
 - game: game2
   alias:
   - Ga2
   presets:
     modpak1
-    pp
 ```
 
 
