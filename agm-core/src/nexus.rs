@@ -1,3 +1,4 @@
+#![allow(unused_imports)]
 use tokio::{fs::File, io::AsyncWriteExt};
 use serde::Deserialize;
 

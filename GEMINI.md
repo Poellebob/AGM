@@ -6,7 +6,7 @@ AGM is a cross-platform mod manager, currently in early development, aiming to p
 
 The project is a Rust workspace composed of several crates:
 
--   `agm-core`: Contains the core logic, data structures, and foundational utilities for mod management. All shared logic that is not specific to a user interface (CLI, TUI, GUI) should reside here to ensure reusability and avoid duplication.
+-   `agm-core`: Contains the core logic, data structures, and foundational utilities for mod management. All shared logic that is not specific to a user interface (CLI, TUI, GUI) should reside here to ensure reusability and avoid duplication. Crucially, `agm-core` must *not* have dependencies on any other crate within the AGM workspace. It should only depend on external crates and the Rust standard library. This ensures its role as the foundational, independent core logic.
 -   `cli`: Provides the command-line interface for interacting with AGM.
 -   `tui`: Intended for a terminal user interface.
 -   `gui`: Intended for a graphical user interface.

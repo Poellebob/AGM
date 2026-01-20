@@ -40,23 +40,10 @@ impl Profile {
             },
             layout: vec![
                 Layout {
-                    name: "bin".to_string(),
-                    node_type: LayoutType::Dir,
-                    sub: Some(vec![
-                        Layout {
-                            name: "binmod".to_string(),
-                            node_type: LayoutType::Moddir,
-                            sub: None,
-                            mime: Some(vec!["zip".to_string(), "pkg".to_string()]),
-                        },
-                    ]),
-                    mime: None,
-                },
-                Layout {
-                    name: "scriptsmod".to_string(),
+                    name: "mods".to_string(),
                     node_type: LayoutType::Moddir,
                     sub: None,
-                    mime: Some(vec!["src".to_string(), "gam".to_string()]),
+                    mime: Some(vec!["txt".to_string(), "zip".to_string(), "rar".to_string(), "7z".to_string(), "tar".to_string()]),
                 },
             ],
         }

@@ -1,5 +1,12 @@
 use crate::config::Config;
-use agm_url_handler::UrlMessage;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UrlMessage {
+    pub url: String,
+    pub scheme: String,
+    pub timestamp: u64,
+}
 use tokio::io::AsyncReadExt;
 use tokio::net::UnixListener;
 use tokio::sync::mpsc;

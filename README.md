@@ -74,9 +74,11 @@ layout:
 game: <name of game>
 
 mods:
-- name: some mod
+- some mod
 - name: other mod
 ```
+
+might add version controll that is why you can do `name: mod`
 
 ## Mod spec
 

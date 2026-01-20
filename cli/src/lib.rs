@@ -35,18 +35,31 @@ pub enum Command {
     },
     /// Manage global application configuration
     Config(CliConfig),
+    Mod {
+        #[command(subcommand)]
+        cmd: CliMod,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum CliMod {
     Install(Install),
+    Remove {
+        name: String,
+        #[arg(long)]
+        purge: bool,
+    },
 }
 
 #[derive(Parser, Debug)]
 pub struct Install {
     /// Profile to use
-    #[arg(long, required = true)]
-    pub profile: String,
-
-    /// Preset to use
     #[arg(long)]
-    pub preset: Vec<String>,
+    pub profile: Option<String>,
+
+    /// Optional name for the mod
+    #[arg(long)]
+    pub name: Option<String>,
 
     /// List of files to install
     #[arg(required = true)]
@@ -72,9 +85,13 @@ pub enum CliProfile {
         game: String,
         #[arg(long)]
         name: Option<String>,
+        content: Option<String>,
     },
 
-    Edit { game: String },
+    Edit {
+        game: String,
+        content: Option<String>,
+    },
 
     Remove { game: String },
 }
@@ -94,11 +111,13 @@ pub enum Preset {
     Add {
         game: String,
         name: String,
+        content: Option<String>,
     },
 
     Edit {
         game: String,
         name: String,
+        content: Option<String>,
     },
 
     Remove {
@@ -169,6 +188,95 @@ impl InstallReporter for CliInstallReporter {
             }
         }
     }
+
+    fn prompt_for_unpack(&self, file_name: &str) -> io::Result<bool> {
+        print!("Do you want to unpack '{}'? (y/N): ", file_name);
+        io::stdout().flush()?;
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        let input = input.trim();
+        Ok(input == "y" || input == "Y")
+    }
+
+    fn prompt_for_profile(&self, profiles: &[String]) -> io::Result<String> {
+        println!("Please choose a profile:");
+        for (i, profile) in profiles.iter().enumerate() {
+            println!("    {}) {}", i + 1, profile);
+        }
+        loop {
+            print!("Your choice: ");
+            io::stdout().flush()?;
+            let mut input = String::new();
+            io::stdin().read_line(&mut input)?;
+            let input = input.trim();
+            if let Ok(choice_index) = input.parse::<usize>() {
+                if choice_index > 0 && choice_index <= profiles.len() {
+                    return Ok(profiles[choice_index - 1].clone());
+                } else {
+                    println!("Invalid number. Please try again.");
+                }
+            } else {
+                println!("Invalid input. Please choose a number.");
+            }
+        }
+    }
+
+    fn prompt_for_mod_name(&self, default_name: &str) -> io::Result<String> {
+        print!("Enter a name for the mod (leave blank to use '{}'): ", default_name);
+        io::stdout().flush()?;
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        let input = input.trim();
+        if input.is_empty() {
+            Ok(default_name.to_string())
+        } else {
+            Ok(input.to_string())
+        }
+    }
+
+    fn confirm_preset_add(&self) -> io::Result<bool> {
+        print!("Do you want to add this mod to a preset? (y/N): ");
+        io::stdout().flush()?;
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        let input = input.trim();
+        Ok(input == "y" || input == "Y")
+    }
+
+    fn prompt_for_presets(&self, presets: &[String]) -> io::Result<Vec<String>> {
+        println!("Please choose presets to add the mod to (e.g., 1 3):");
+        for (i, preset) in presets.iter().enumerate() {
+            println!("    {}) {}", i + 1, preset);
+        }
+        print!("Your choice: ");
+        io::stdout().flush()?;
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        
+        let selected_presets = input
+            .split_whitespace()
+            .filter_map(|s| s.parse::<usize>().ok())
+            .filter_map(|i| presets.get(i - 1).cloned())
+            .collect();
+            
+        Ok(selected_presets)
+    }
+
+    fn confirm_profile_parts_removal(&self) -> io::Result<(bool, bool)> {
+        print!("Do you want to remove all associated presets? (y/N): ");
+        io::stdout().flush()?;
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        let remove_presets = input.trim().eq_ignore_ascii_case("y");
+
+        print!("Do you want to remove all associated mod files from storage? (y/N): ");
+        io::stdout().flush()?;
+        input.clear();
+        io::stdin().read_line(&mut input)?;
+        let remove_mods = input.trim().eq_ignore_ascii_case("y");
+
+        Ok((remove_presets, remove_mods))
+    }
 }
 
 pub async fn run(args: Args) {
@@ -188,19 +296,22 @@ pub async fn run(args: Args) {
             CliProfile::List => {
                 agm.list_profiles();
             }
-            CliProfile::Add { game, name } => {
-                if let Err(e) = agm.add_profile(game, name) {
+            CliProfile::Add { game, name, content } => {
+                if let Err(e) = agm.add_profile(game, name, content) {
                     eprintln!("Error adding profile: {}", e);
                 }
             }
-            CliProfile::Edit { game } => {
-                if let Err(e) = agm.edit_profile(&game) {
+            CliProfile::Edit { game, content } => {
+                if let Err(e) = agm.edit_profile(&game, content) {
                     eprintln!("Error editing profile: {}", e);
                 }
             }
             CliProfile::Remove { game } => {
-                if let Err(e) = agm.remove_profile(&game) {
-                    eprintln!("Error removing profile: {}", e);
+                let reporter = CliInstallReporter;
+                if let Ok((remove_presets, remove_mods)) = reporter.confirm_profile_parts_removal() {
+                    if let Err(e) = agm.remove_profile(&game, remove_presets, remove_mods) {
+                        eprintln!("Error removing profile: {}", e);
+                    }
                 }
             }
         },
@@ -214,13 +325,13 @@ pub async fn run(args: Args) {
             Preset::List { profile } => {
                 agm.list_presets(profile);
             }
-            Preset::Add { game, name } => {
-                if let Err(e) = agm.add_preset(game, name) {
+            Preset::Add { game, name, content } => {
+                if let Err(e) = agm.add_preset(game, name, content) {
                     eprintln!("Error adding preset: {}", e);
                 }
             }
-            Preset::Edit { game, name } => {
-                if let Err(e) = agm.edit_preset(&game, &name) {
+            Preset::Edit { game, name, content } => {
+                if let Err(e) = agm.edit_preset(&game, &name, content) {
                     eprintln!("Error editing preset: {}", e);
                 }
             }
@@ -243,10 +354,69 @@ pub async fn run(args: Args) {
             }
         }
 
-        Some(Command::Install(cmd)) => {
-            let reporter = CliInstallReporter;
-            if let Err(e) = agm.install_mods(&cmd.files, &cmd.profile, &reporter).await {
-                eprintln!("Error installing mods: {}", e);
+        Some(Command::Mod { cmd }) => match cmd {
+            CliMod::Install(mut cmd) => {
+                let reporter = CliInstallReporter;
+                
+                let profile_name = match cmd.profile.take() {
+                    Some(p) => p,
+                    None => {
+                        let profiles = agm.get_profile_names();
+                        if profiles.is_empty() {
+                            eprintln!("No profiles found. Please add a profile first.");
+                            return;
+                        }
+                        reporter.prompt_for_profile(&profiles).unwrap()
+                    }
+                };
+
+                let mod_name = match cmd.name.take() {
+                    Some(n) => n,
+                    None => {
+                        let default_name = Path::new(&cmd.files[0])
+                            .file_stem()
+                            .and_then(|s| s.to_str())
+                            .unwrap_or("unnamed_mod")
+                            .to_string();
+                        reporter.prompt_for_mod_name(&default_name).unwrap()
+                    }
+                };
+                
+                if let Err(e) = agm.install_mods(&cmd.files, &profile_name, &mod_name, &reporter).await {
+                    eprintln!("Error installing mods: {}", e);
+                    return;
+                }
+
+                if reporter.confirm_preset_add().unwrap() {
+                    let presets = agm.get_preset_names(&profile_name);
+                    if presets.is_empty() {
+                        println!("No presets found for profile '{}'.", profile_name);
+                        return;
+                    }
+                    if let Ok(selected_presets) = reporter.prompt_for_presets(&presets) {
+                        if !selected_presets.is_empty() {
+                            if let Err(e) = agm.add_mod_to_presets(&profile_name, &mod_name, &selected_presets) {
+                                eprintln!("Error adding mod to presets: {}", e);
+                            }
+
+                            // Check if any of the selected presets are active and activate the mod if so
+                            for preset in &selected_presets {
+                                if agm.is_preset_active(&profile_name, preset) {
+                                    println!("Activating mod '{}' as it was added to the active preset '{}'.", mod_name, preset);
+                                    if let Err(e) = agm.activate_mod(&profile_name, &mod_name) {
+                                        eprintln!("Error activating mod: {}", e);
+                                    }
+                                    break; // Activate only once
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            CliMod::Remove { name, purge } => {
+                if let Err(e) = agm.remove_mod(&name, purge) {
+                    eprintln!("Error removing mod: {}", e);
+                }
             }
         }
 

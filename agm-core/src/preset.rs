@@ -9,16 +9,27 @@ pub struct Preset {
     pub mods: Vec<Mod>,
 }
 
+
 #[derive(Debug, Deserialize, Serialize)]
-pub struct Mod {
-    pub name: String,
+#[serde(untagged)]
+pub enum Mod {
+    Simple(String),
+    Detailed(ModInfo),
 }
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ModInfo {
+    pub name: String,
+    pub url: Option<String>,
+    pub files: Option<Vec<String>>,
+}
+
 
 impl Preset {
     pub fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
-            mods: Vec::new(),
+            mods: Vec::<Mod>::new(),
         }
     }
 
