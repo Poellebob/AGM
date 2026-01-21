@@ -265,7 +265,7 @@ impl InstallReporter for CliInstallReporter {
             .filter_map(|s| s.parse::<usize>().ok())
             .filter_map(|i| presets.get(i - 1).cloned())
             .collect();
-            
+
         Ok(selected_presets)
     }
 
@@ -535,7 +535,7 @@ pub async fn run(args: Args) {
                         return;
                     }
                     if let Ok(selected_presets) = reporter.prompt_for_presets(&presets) {
-                        if !selected_presets.is_empty() { 
+                        if selected_presets.is_empty() { 
                             return; 
                         }
 
