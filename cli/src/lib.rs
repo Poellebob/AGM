@@ -112,6 +112,8 @@ pub enum Preset {
         game: String,
         name: String,
         content: Option<String>,
+        #[arg(long)]
+        nomods: bool,
     },
 
     Edit {
@@ -392,11 +394,39 @@ pub async fn run(args: Args) {
                     }
                 }
             }
-            Preset::Add { game, name, content } => {
+            Preset::Add { game, name, content, nomods } => {
                 if let Err(e) = agm.add_preset(game.clone(), name.clone(), content) {
                     eprintln!("Error adding preset: {}", e);
-                } else {
-                    println!("Created preset '{}' for game '{}'.", name, game);
+                    return;
+                }
+
+                println!("Created preset '{}' for game '{}'.", name, game);
+
+                if nomods {
+                    return;
+                }
+
+                match agm.list_mods_for_game(&game) {
+                    Ok(mods) => {
+                        if mods.is_empty() {
+                            println!("No mods found for game '{}' to add to the preset.", game);
+                        } else {
+                            let reporter = CliInstallReporter;
+                            println!("\nSelect mods to add to the new preset '{}':", name);
+                            if let Ok(selected_mods) = reporter.prompt_for_presets(&mods) {
+                                if !selected_mods.is_empty() {
+                                    if let Err(e) = agm.add_mods_to_preset(&game, &name, &selected_mods) {
+                                        eprintln!("Error adding mods to preset: {}", e);
+                                    } else {
+                                        println!("Successfully added {} mods to preset '{}'.", selected_mods.len(), name);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Error listing mods for game '{}': {}", game, e);
+                    }
                 }
             }
             Preset::Edit { game, name, content } => {

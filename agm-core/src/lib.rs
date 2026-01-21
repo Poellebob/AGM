@@ -140,14 +140,14 @@ impl Agm {
     pub fn add_profile(&mut self, game: String, name: Option<String>, content: Option<String>, game_path: Option<String>) -> Result<(), Error> {
         let profile_name = name.unwrap_or_else(|| game.clone());
         let profile_path = Config::get_data_dir()?.join("profiles").join(format!("{}.yaml", profile_name));
-
+    
         if profile_path.exists() {
             return Err(io::Error::new(
                 io::ErrorKind::AlreadyExists,
                 format!("Profile '{}' already exists.", profile_name),
             ).into());
         }
-
+    
         let content_to_write = if let Some(c) = content {
             c
         } else if let Some(game_path) = game_path {
@@ -163,13 +163,15 @@ impl Agm {
         }
         
         std::fs::write(&profile_path, &content_to_write)?;
-
+    
         self.config.profiles.push(profile_name.clone());
         self.config.save()?;
-
+    
+        // Automatically create a "nomods" preset for the new profile
+        self.add_preset(game.clone(), "nomods".to_string(), None)?;
+    
         Ok(())
     }
-
     pub fn edit_profile(&self, name: &str, content: Option<String>) -> Result<(), Error> {
         let profile_path = Config::get_data_dir()?.join("profiles").join(format!("{}.yaml", name));
         if !profile_path.exists() {
@@ -178,6 +180,24 @@ impl Agm {
 
         let editor = get_editor(&self.config);
         open_in_editor(&editor, &profile_path, content.as_deref())
+    }
+
+    pub fn list_mods_for_game(&self, game: &str) -> Result<Vec<String>, Error> {
+        let storage_path = Config::get_data_dir()?.join("storage").join(game);
+        if !storage_path.exists() {
+            return Ok(Vec::new());
+        }
+
+        let mut mods = Vec::new();
+        for entry in fs::read_dir(storage_path)? {
+            let entry = entry?;
+            if entry.file_type()?.is_dir() {
+                if let Some(mod_name) = entry.file_name().to_str() {
+                    mods.push(mod_name.to_string());
+                }
+            }
+        }
+        Ok(mods)
     }
 
     pub fn remove_profile(&mut self, name: &str, remove_presets: bool, remove_mods: bool) -> Result<(), Error> {
@@ -304,6 +324,28 @@ impl Agm {
                 return Err(Error::PresetNotFound(preset_name.to_string(), game.to_string()));
             }
         }
+        Ok(())
+    }
+
+    pub fn add_mods_to_preset(&mut self, game: &str, preset_name: &str, mod_names: &[String]) -> Result<(), Error> {
+        let preset_path = Config::get_data_dir()?.join("presets").join(game).join(format!("{}.yaml", preset_name));
+        if !preset_path.exists() {
+            return Err(Error::PresetNotFound(preset_name.to_string(), game.to_string()));
+        }
+
+        let mut preset = Preset::from_file(&preset_path);
+        for mod_name in mod_names {
+            // Avoid duplicates
+            if !preset.mods.iter().any(|m| match m {
+                preset::Mod::Simple(name) => name == mod_name,
+                preset::Mod::Detailed(info) => &info.name == mod_name,
+            }) {
+                preset.mods.push(crate::preset::Mod::Simple(mod_name.to_string()));
+            }
+        }
+
+        let yaml_string = serde_yaml::to_string(&preset)?;
+        std::fs::write(&preset_path, yaml_string)?;
         Ok(())
     }
 
