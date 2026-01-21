@@ -1,9 +1,7 @@
-use agm_core::ipc::{create_url_channel, start_ipc_server};
-use agm_core::{install::InstallReporter, nexus, Agm};
+use agm_core::{install::InstallReporter, Agm, run_url_handler};
 pub use clap::{CommandFactory, Parser, Subcommand};
 use std::io::{self, Write};
 use std::path::Path;
-use url::Url;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -83,7 +81,6 @@ pub enum CliProfile {
 
     Add {
         game: String,
-        #[arg(long)]
         name: Option<String>,
         content: Option<String>,
     },
@@ -98,6 +95,10 @@ pub enum CliProfile {
 
 #[derive(Subcommand, Debug)]
 pub enum Preset {
+    Reload {
+        game: String,
+    },
+
     Switch {
         game: String,
         preset: String,
@@ -316,9 +317,10 @@ pub async fn run(args: Args) {
                     }
                 }
             }
+
             CliProfile::Add { game, name, content } => {
                 let game_path = if content.is_none() {
-                    println!("Please enter the full path to the game's executable:");
+                    println!("Please enter the full path to the game's base dir:");
                     let mut game_path = String::new();
                     if io::stdin().read_line(&mut game_path).is_err() {
                         eprintln!("Error reading game path");
@@ -336,11 +338,13 @@ pub async fn run(args: Args) {
                     println!("Created profile '{}'.", profile_name);
                 }
             }
+
             CliProfile::Edit { game, content } => {
                 if let Err(e) = agm.edit_profile(&game, content) {
                     eprintln!("Error editing profile: {}", e);
                 }
             }
+
             CliProfile::Remove { game } => {
                 let reporter = CliInstallReporter;
                 if let Ok((remove_presets, remove_mods)) = reporter.confirm_profile_parts_removal() {
@@ -354,13 +358,36 @@ pub async fn run(args: Args) {
         },
 
         Some(Command::Preset { cmd }) => match cmd {
+            Preset::Reload { game } => {
+                let names = agm.get_preset_names(&game);
+                let mut active = "".to_string();
+
+                for name in names {
+                    if !agm.is_preset_active(&game, &name) {
+                        continue;
+                    }
+
+                    active = name;
+                    break;
+                }
+
+                if active == "" {
+                    if let Err(e) = agm.switch_preset(&game, &preset) {
+                        eprintln!("error reloding preset: {}", e);
+                    } else {
+                        println!("Reloded";
+                    }
+                }
+            }
+
             Preset::Switch { game, preset } => {
                 if let Err(e) = agm.switch_preset(&game, &preset) {
-                    eprintln!("Error switching preset: {}", e);
+                    eprintln!("error switching preset: {}", e);
                 } else {
                     println!("Switched to preset '{}' for game '{}'.", preset, game);
                 }
             }
+
             Preset::List { profile } => {
                 let presets = agm.get_presets();
                 if let Some(game_name) = profile {
@@ -379,21 +406,23 @@ pub async fn run(args: Args) {
                 } else {
                     if presets.is_empty() {
                         println!("No presets found.");
-                    } else {
-                        println!("All configured presets:");
-                        for preset_config in presets {
-                            println!("- {}:", preset_config.game);
-                            for preset in &preset_config.presets {
-                                if Some(preset) == preset_config.active_preset.as_ref() {
-                                    println!("    - {} (active)", preset);
-                                } else {
-                                    println!("    - {}", preset);
-                                }
+                        return;
+                    }
+
+                    println!("All configured presets:");
+                    for preset_config in presets {
+                        println!("- {}:", preset_config.game);
+                        for preset in &preset_config.presets {
+                            if Some(preset) == preset_config.active_preset.as_ref() {
+                                println!("    - {} (active)", preset);
+                            } else {
+                                println!("    - {}", preset);
                             }
                         }
                     }
                 }
             }
+
             Preset::Add { game, name, content, nomods } => {
                 if let Err(e) = agm.add_preset(game.clone(), name.clone(), content) {
                     eprintln!("Error adding preset: {}", e);
@@ -410,17 +439,20 @@ pub async fn run(args: Args) {
                     Ok(mods) => {
                         if mods.is_empty() {
                             println!("No mods found for game '{}' to add to the preset.", game);
-                        } else {
-                            let reporter = CliInstallReporter;
-                            println!("\nSelect mods to add to the new preset '{}':", name);
-                            if let Ok(selected_mods) = reporter.prompt_for_presets(&mods) {
-                                if !selected_mods.is_empty() {
-                                    if let Err(e) = agm.add_mods_to_preset(&game, &name, &selected_mods) {
-                                        eprintln!("Error adding mods to preset: {}", e);
-                                    } else {
-                                        println!("Successfully added {} mods to preset '{}'.", selected_mods.len(), name);
-                                    }
-                                }
+                            return;
+                        }
+
+                        let reporter = CliInstallReporter;
+                        println!("\nSelect mods to add to the new preset '{}':", name);
+                        if let Ok(selected_mods) = reporter.prompt_for_presets(&mods) {
+                            if selected_mods.is_empty() {
+                                return;
+                            }
+
+                            if let Err(e) = agm.add_mods_to_preset(&game, &name, &selected_mods) {
+                                eprintln!("Error adding mods to preset: {}", e);
+                            } else {
+                                println!("Successfully added {} mods to preset '{}'.", selected_mods.len(), name);
                             }
                         }
                     }
@@ -429,11 +461,13 @@ pub async fn run(args: Args) {
                     }
                 }
             }
+
             Preset::Edit { game, name, content } => {
                 if let Err(e) = agm.edit_preset(&game, &name, content) {
                     eprintln!("Error editing preset: {}", e);
                 }
             }
+
             Preset::Remove { game, name } => {
                 if let Err(e) = agm.remove_preset(&game, &name) {
                     eprintln!("Error removing preset: {}", e);
@@ -501,29 +535,32 @@ pub async fn run(args: Args) {
                         return;
                     }
                     if let Ok(selected_presets) = reporter.prompt_for_presets(&presets) {
-                        if !selected_presets.is_empty() {
-                            if let Err(e) = agm.add_mod_to_presets(&profile_name, &mod_name, &selected_presets) {
-                                eprintln!("Error adding mod to presets: {}", e);
-                            } else {
-                                for preset in &selected_presets {
-                                    println!("Added mod '{}' to preset '{}'.", mod_name, preset);
-                                }
-                            }
+                        if !selected_presets.is_empty() { 
+                            return; 
+                        }
 
-                            // Check if any of the selected presets are active and activate the mod if so
+                        if let Err(e) = agm.add_mod_to_presets(&profile_name, &mod_name, &selected_presets) {
+                            eprintln!("Error adding mod to presets: {}", e);
+                        } else {
                             for preset in &selected_presets {
-                                if agm.is_preset_active(&profile_name, preset) {
-                                    println!("Activating mod '{}' as it was added to the active preset '{}'.", mod_name, preset);
-                                    if let Err(e) = agm.activate_mod(&profile_name, &mod_name) {
-                                        eprintln!("Error activating mod: {}", e);
-                                    }
-                                    break; // Activate only once
+                                println!("Added mod '{}' to preset '{}'.", mod_name, preset);
+                            }
+                        }
+
+                        // Check if any of the selected presets are active and activate the mod if so
+                        for preset in &selected_presets {
+                            if agm.is_preset_active(&profile_name, preset) {
+                                println!("Activating mod '{}' as it was added to the active preset '{}'.", mod_name, preset);
+                                if let Err(e) = agm.activate_mod(&profile_name, &mod_name) {
+                                    eprintln!("Error activating mod: {}", e);
                                 }
+                                break; // Activate only once
                             }
                         }
                     }
                 }
             }
+
             CliMod::Remove { name, purge } => {
                 if let Err(e) = agm.remove_mod(&name, purge) {
                     eprintln!("Error removing mod: {}", e);
@@ -540,57 +577,4 @@ pub async fn run(args: Args) {
             Args::command().print_help().unwrap();
         }
     }
-}
-
-async fn run_url_handler() -> Result<(), Box<dyn std::error::Error + Send>> {
-    let (url_sender, mut url_receiver) = create_url_channel();
-    let port = 3000;
-
-    let ipc_server_handle = tokio::spawn(start_ipc_server(url_sender, port));
-
-    println!("IPC server started on port {}. Waiting for URLs...", port);
-
-    if let Some(url_message) = url_receiver.recv().await {
-        if let Ok(parsed_url) = Url::parse(&url_message.url) {
-            if parsed_url.scheme() == "nxm" {
-                let game = parsed_url.host_str().unwrap_or_default().to_string();
-                let path_segments: Vec<&str> =
-                    parsed_url.path_segments().map(|c| c.collect()).unwrap_or_default();
-
-                if path_segments.len() == 4
-                    && path_segments[0] == "mods"
-                    && path_segments[2] == "files"
-                {
-                    let mod_id: u64 = path_segments[1].parse().unwrap_or(0);
-                    let file_id: u64 = path_segments[3].parse().unwrap_or(0);
-
-                    if mod_id > 0 && file_id > 0 {
-                        let agm = match Agm::new() {
-                            Ok(agm) => agm,
-                            Err(e) => {
-                                eprintln!("Error initializing AGM: {}", e);
-                                return Err(Box::new(e));
-                            }
-                        };
-                        if let Some(api_key) = agm.get_nexus_api_key() {
-                            match nexus::get_download_link(api_key, &game, mod_id, file_id).await {
-                                Ok(link) => {
-                                    println!("{}", link);
-                                }
-                                Err(e) => {
-                                    eprintln!("Error getting download link: {}", e);
-                                }
-                            }
-                        } else {
-                            eprintln!("Nexus API key not set. Please set it using 'agm config --nexus-api-key <key>'");
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    ipc_server_handle
-        .await
-        .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?
 }
