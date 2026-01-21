@@ -372,7 +372,7 @@ pub async fn run(args: Args) {
                 }
 
                 if active == "" {
-                    if let Err(e) = agm.switch_preset(&game, &preset) {
+                    if let Err(e) = agm.switch_preset(&game, &active) {
                         eprintln!("error reloding preset: {}", e);
                     } else {
                         println!("Reloded");
