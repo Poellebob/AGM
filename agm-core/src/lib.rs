@@ -8,7 +8,8 @@ pub mod profile;
 pub mod symlink;
 
 use crate::install::{install_mods as core_install_mods, InstallReporter};
-use config::{Config, PresetConfig};
+use crate::config::{Config, PresetConfig};
+use crate::ipc::{start_ipc_server, create_url_channel};
 use std::env;
 use std::fs;
 use std::io;
@@ -17,6 +18,7 @@ use std::process::Command;
 use crate::preset::Preset;
 use crate::profile::Profile;
 use serde_yaml;
+use url::Url;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -56,11 +58,23 @@ fn open_in_editor(editor: &str, file_path: &Path, content: Option<&str>) -> Resu
         std::fs::write(file_path, content)?;
         return Ok(());
     }
-    let status = Command::new(editor).arg(file_path).status()?;
-    if !status.success() {
-        return Err(Error::Editor);
+    
+    let result = Command::new(editor).arg(file_path).status();
+    
+    match result {
+        Ok(status) => {
+            if status.success() {
+                return Ok(());
+            }
+
+            eprintln!("Editor exited with non-zero status: {:?}", status);
+            return Err(Error::Editor);
+        }
+        Err(e) => {
+            eprintln!("Failed to run editor '{}': {}", editor, e);
+            return Err(Error::Editor);
+        }
     }
-    Ok(())
 }
 
 pub struct Agm {
@@ -94,13 +108,15 @@ impl Agm {
         if mod_spec_path.exists() {
             let mod_spec: crate::mod_spec::ModSpec = serde_yaml::from_str(&std::fs::read_to_string(&mod_spec_path)?)?;
             for file_entry in &mod_spec.files {
-                if !file_entry.point.is_empty() {
-                    if let Some(dest_dir_suffix) = profile.resolve_point(&file_entry.point) {
-                        let source_path = storage_path.join(&file_entry.target);
-                        let dest_path = Path::new(&profile.game.path).join(dest_dir_suffix).join(&file_entry.target);
-                        crate::symlink::create_symlink(&source_path, &dest_path)?;
-                        symlinks.push((source_path, dest_path));
-                    }
+                if file_entry.point.is_empty() {
+                    return Ok(vec![]);
+                }
+
+                if let Some(dest_dir_suffix) = profile.resolve_point(&file_entry.point) {
+                    let source_path = storage_path.join(&file_entry.target);
+                    let dest_path = Path::new(&profile.game.path).join(dest_dir_suffix).join(&file_entry.target);
+                    crate::symlink::create_symlink(&source_path, &dest_path)?;
+                    symlinks.push((source_path, dest_path));
                 }
             }
         }
@@ -251,13 +267,13 @@ impl Agm {
         let preset_path = Config::get_data_dir()?.join("presets").join(&game).join(format!("{}.yaml", name));
         
         let preset_dir = Config::get_data_dir()?.join("presets").join(&game);
-        if !preset_dir.exists() {
-            std::fs::create_dir_all(&preset_dir)?;
-        }
-
+        
+        
         if preset_path.exists() {
             return Err(io::Error::new(io::ErrorKind::AlreadyExists, format!("Preset '{}' for game '{}' already exists.", name, game)).into());
         }
+
+        std::fs::create_dir_all(&preset_dir)?;
 
         let new_preset = crate::preset::Preset::new(&name);
         let yaml_string = serde_yaml::to_string(&new_preset)?;
@@ -279,14 +295,16 @@ impl Agm {
         Ok(())
     }
 
-    pub fn edit_preset(&self, game: &str, name: &str, content: Option<String>) -> Result<(), Error> {
+    pub fn edit_preset(&mut self, game: &str, name: &str, content: Option<String>) -> Result<(), Error> {
         let preset_path = Config::get_data_dir()?.join("presets").join(game).join(format!("{}.yaml", name));
         if !preset_path.exists() {
              return Err(Error::PresetNotFound(name.to_string(), game.to_string()));
         }
 
         let editor = get_editor(&self.config);
-        open_in_editor(&editor, &preset_path, content.as_deref())
+        open_in_editor(&editor, &preset_path, content.as_deref())?;
+        
+        Ok(())
     }
 
     pub fn remove_preset(&mut self, game: &str, name: &str) -> Result<(), Error> {
@@ -315,14 +333,15 @@ impl Agm {
     pub fn add_mod_to_presets(&mut self, game: &str, mod_name: &str, presets: &[String]) -> Result<(), Error> {
         for preset_name in presets {
             let preset_path = Config::get_data_dir()?.join("presets").join(game).join(format!("{}.yaml", preset_name));
-            if preset_path.exists() {
-                let mut preset = Preset::from_file(&preset_path);
-                preset.mods.push(crate::preset::Mod::Simple(mod_name.to_string()));
-                let yaml_string = serde_yaml::to_string(&preset)?;
-                std::fs::write(&preset_path, yaml_string)?;
-            } else {
+            
+            if !preset_path.exists() {
                 return Err(Error::PresetNotFound(preset_name.to_string(), game.to_string()));
             }
+
+            let mut preset = Preset::from_file(&preset_path);
+            preset.mods.push(crate::preset::Mod::Simple(mod_name.to_string()));
+            let yaml_string = serde_yaml::to_string(&preset)?;
+            std::fs::write(&preset_path, yaml_string)?;
         }
         Ok(())
     }
@@ -353,15 +372,17 @@ impl Agm {
         for preset_config in &self.config.presets {
             for preset_name in &preset_config.presets {
                 let preset_path = Config::get_data_dir()?.join("presets").join(&preset_config.game).join(format!("{}.yaml", preset_name));
-                if preset_path.exists() {
-                    let mut preset = Preset::from_file(&preset_path);
-                    preset.mods.retain(|m| match m {
-                        crate::preset::Mod::Simple(mod_name) => mod_name != name,
-                        crate::preset::Mod::Detailed(info) => info.name != name,
-                    });
-                    let yaml_string = serde_yaml::to_string(&preset)?;
-                    std::fs::write(&preset_path, yaml_string)?;
+                if !preset_path.exists() {
+                    continue;
                 }
+
+                let mut preset = Preset::from_file(&preset_path);
+                preset.mods.retain(|m| match m {
+                    crate::preset::Mod::Simple(mod_name) => mod_name != name,
+                    crate::preset::Mod::Detailed(info) => info.name != name,
+                });
+                let yaml_string = serde_yaml::to_string(&preset)?;
+                std::fs::write(&preset_path, yaml_string)?;
             }
         }
 
@@ -412,19 +433,26 @@ impl Agm {
                         preset::Mod::Detailed(info) => &info.name,
                     };
                     let mod_spec_path = Config::get_data_dir()?.join("storage").join(game).join(mod_name).join(format!("{}.yaml", mod_name));
-                    if mod_spec_path.exists() {
-                        let mod_spec: crate::mod_spec::ModSpec = serde_yaml::from_str(&std::fs::read_to_string(&mod_spec_path)?)?;
-                        for file_entry in &mod_spec.files {
-                            if !file_entry.point.is_empty() {
-                                if let Some(dest_dir_suffix) = profile.resolve_point(&file_entry.point) {
-                                    let dest_path = Path::new(&profile.game.path).join(dest_dir_suffix).join(&file_entry.target);
-                                    if dest_path.exists() {
-                                        if dest_path.is_symlink() {
-                                            std::fs::remove_file(&dest_path)?;
-                                            removed_symlinks.push(dest_path);
-                                        }
-                                    }
-                                }
+                    
+                    if !mod_spec_path.exists() {
+                        continue;
+                    }
+                    
+                    let mod_spec: crate::mod_spec::ModSpec = serde_yaml::from_str(&std::fs::read_to_string(&mod_spec_path)?)?;
+                    for file_entry in &mod_spec.files {
+                        if file_entry.point.is_empty() {
+                            continue;
+                        }
+
+                        if let Some(dest_dir_suffix) = profile.resolve_point(&file_entry.point) {
+                            let dest_path = Path::new(&profile.game.path).join(dest_dir_suffix).join(&file_entry.target);
+                            if !dest_path.exists() {
+                                continue;
+                            }
+
+                            if dest_path.is_symlink() {
+                                std::fs::remove_file(&dest_path)?;
+                                removed_symlinks.push(dest_path);
                             }
                         }
                     }
@@ -453,4 +481,57 @@ impl Agm {
         }
         Ok(created_symlinks)
     }
+}
+
+pub async fn run_url_handler() -> Result<(), Box<dyn std::error::Error + Send>> {
+    let (url_sender, mut url_receiver) = create_url_channel();
+    let port = 3000;
+
+    let ipc_server_handle = tokio::spawn(start_ipc_server(url_sender, port));
+
+    println!("IPC server started on port {}. Waiting for URLs...", port);
+
+    if let Some(url_message) = url_receiver.recv().await {
+        if let Ok(parsed_url) = Url::parse(&url_message.url) {
+            if parsed_url.scheme() == "nxm" {
+                let game = parsed_url.host_str().unwrap_or_default().to_string();
+                let path_segments: Vec<&str> =
+                    parsed_url.path_segments().map(|c| c.collect()).unwrap_or_default();
+
+                if path_segments.len() == 4
+                    && path_segments[0] == "mods"
+                    && path_segments[2] == "files"
+                {
+                    let mod_id: u64 = path_segments[1].parse().unwrap_or(0);
+                    let file_id: u64 = path_segments[3].parse().unwrap_or(0);
+
+                    if mod_id > 0 && file_id > 0 {
+                        let agm = match Agm::new() {
+                            Ok(agm) => agm,
+                            Err(e) => {
+                                eprintln!("Error initializing AGM: {}", e);
+                                return Err(Box::new(e));
+                            }
+                        };
+                        if let Some(api_key) = agm.get_nexus_api_key() {
+                            match nexus::get_download_link(api_key, &game, mod_id, file_id).await {
+                                Ok(link) => {
+                                    println!("{}", link);
+                                }
+                                Err(e) => {
+                                    eprintln!("Error getting download link: {}", e);
+                                }
+                            }
+                        } else {
+                            eprintln!("Nexus API key not set. Please set it using 'agm config --nexus-api-key <key>'");
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    ipc_server_handle
+        .await
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?
 }
