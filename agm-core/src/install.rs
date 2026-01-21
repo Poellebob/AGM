@@ -19,6 +19,7 @@ pub trait InstallReporter {
     fn confirm_preset_add(&self) -> io::Result<bool>;
     fn prompt_for_presets(&self, presets: &[String]) -> io::Result<Vec<String>>;
     fn confirm_profile_parts_removal(&self) -> io::Result<(bool, bool)>;
+    fn warn(&self, message: &str);
 }
 
 async fn unpack_zip(
@@ -62,7 +63,7 @@ async fn unpack_rar(
     // to the storage path. The user will be informed if they try to "unpack" it.
     let dest_path = storage_path.join(file_path.file_name().unwrap());
     fs::copy(file_path, dest_path)?;
-    eprintln!("Warning: .rar files are not automatically unpacked. Please extract '{}' manually if needed.", file_path.display());
+    reporter.warn(&format!("Warning: .rar files are not automatically unpacked. Please extract '{}' manually if needed.", file_path.display()));
     Ok(())
 }
 
@@ -76,7 +77,7 @@ async fn unpack_7z(
     // to the storage path. The user will be informed if they try to "unpack" it.
     let dest_path = storage_path.join(file_path.file_name().unwrap());
     fs::copy(file_path, dest_path)?;
-    eprintln!("Warning: .7z files are not automatically unpacked. Please extract '{}' manually if needed.", file_path.display());
+    reporter.warn(&format!("Warning: .7z files are not automatically unpacked. Please extract '{}' manually if needed.", file_path.display()));
     Ok(())
 }
 
@@ -205,7 +206,7 @@ pub async fn install_mods(
     mod_name: &str,
     reporter: &dyn InstallReporter,
 ) -> io::Result<()> {
-    let data_dir = Config::get_data_dir();
+    let data_dir = Config::get_data_dir()?;
     let profile_path = data_dir.join("profiles").join(format!("{}.yaml", profile_name));
 
     if !profile_path.exists() {

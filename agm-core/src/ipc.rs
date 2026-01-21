@@ -24,7 +24,7 @@ pub async fn start_ipc_server(
     url_sender: UrlSender,
     _port: u16, // port is no longer used, but kept for compatibility with calling code
 ) -> Result<(), Box<dyn std::error::Error + Send>> {
-    let socket_path = Config::get_socket_path();
+    let socket_path = Config::get_socket_path().map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?;
     // Ensure the socket file does not exist
     if socket_path.exists() {
         std::fs::remove_file(&socket_path)

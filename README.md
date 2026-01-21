@@ -61,11 +61,15 @@ layout:
   sub:
   - name: binmod
     type: moddir
-    mime: [zip, pkg] # .zip or pkg's go here
+    mime:
+    - bin
+    - pkg  # tells agm .zip's or pkg's go here
 
 - name: scriptsmod
   type: moddir
-  mime: [src, gam]
+  mime: 
+  - src
+  - zip
 ```
 
 ## Preset | Mod collection spec (mod pack)
@@ -74,11 +78,12 @@ layout:
 game: <name of game>
 
 mods:
-- some mod
-- name: other mod
+- mod1 # this tells agm that mod1 should be installed by this prerset
+- name: mod2
 ```
 
-might add version controll that is why you can do `name: mod`
+you can do `name: mod`, so other atributes 
+can be given like `url: <url>` for automatic game spec download (comming soon)
 
 ## Mod spec
 

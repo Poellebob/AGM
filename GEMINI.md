@@ -6,7 +6,7 @@ AGM is a cross-platform mod manager, currently in early development, aiming to p
 
 The project is a Rust workspace composed of several crates:
 
--   `agm-core`: Contains the core logic, data structures, and foundational utilities for mod management. All shared logic that is not specific to a user interface (CLI, TUI, GUI) should reside here to ensure reusability and avoid duplication. Crucially, `agm-core` must *not* have dependencies on any other crate within the AGM workspace. It should only depend on external crates and the Rust standard library. This ensures its role as the foundational, independent core logic.
+-   `agm-core`: Contains the core logic, data structures, and foundational utilities for mod management. All shared logic that is not specific to a user interface (CLI, TUI, GUI) should reside here to ensure reusability and avoid duplication. Crucially, `agm-core` must *not* have dependencies on any other crate within the AGM workspace. It should only depend on external crates and the Rust standard library. This ensures its role as the foundational, independent core logic. It is architected to be completely headless, containing no direct user I/O (like printing to the console or reading from standard input). All user interaction is delegated to the frontend crates (`cli`, `tui`, `gui`) through traits like `InstallReporter`.
 -   `cli`: Provides the command-line interface for interacting with AGM.
 -   `tui`: Intended for a terminal user interface.
 -   `gui`: Intended for a graphical user interface.
@@ -60,9 +60,11 @@ and nothing to do with to do with mod management so no logic gets written twice.
     *   Handles core logic for mod installation, including file extraction, `ModSpec` generation, and automatic placement guessing.
     *   Handles basic configuration loading, saving, and directory management.
     *   Includes modules for Nexus API interaction and IPC.
+    *   Is completely free of user I/O operations, with errors propagated and frontend interaction handled via traits.
 *   **`cli`:**
     *   Uses `clap` for command-line argument parsing.
     *   Implements the `InstallReporter` trait for interactive installation via the command line.
+    *   Handles all user interaction, such as prompting for input and displaying information.
     *   Most other commands (`profile`, `preset`) are still basic stubs.
 *   **`tui` & `gui`:** These interfaces are present but not yet implemented. They are expected to implement the `InstallReporter` trait for their respective UIs.
 

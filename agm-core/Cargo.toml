@@ -15,6 +15,7 @@ walkdir = "2.5.0"
 unrar = "0.5.5"
 sevenz-rust = "*"
 tar = "0.4.40"
+thiserror = "2.0.18"
 
 
 [build-dependencies]
