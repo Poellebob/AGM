@@ -188,6 +188,7 @@ impl Agm {
     
         Ok(())
     }
+
     pub fn edit_profile(&self, name: &str, content: Option<String>) -> Result<(), Error> {
         let profile_path = Config::get_data_dir()?.join("profiles").join(format!("{}.yaml", name));
         if !profile_path.exists() {

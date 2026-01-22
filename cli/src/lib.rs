@@ -374,18 +374,20 @@ pub async fn run(args: Args) {
                 if active == "" {
                     if let Err(e) = agm.switch_preset(&game, &active) {
                         eprintln!("error reloding preset: {}", e);
-                    } else {
-                        println!("Reloded");
+                        return;
                     }
+
+                    println!("Reloded");
                 }
             }
 
             Preset::Switch { game, preset } => {
                 if let Err(e) = agm.switch_preset(&game, &preset) {
                     eprintln!("error switching preset: {}", e);
-                } else {
-                    println!("Switched to preset '{}' for game '{}'.", preset, game);
+                    return;
                 }
+
+                println!("Switched to preset '{}' for game '{}'.", preset, game);
             }
 
             Preset::List { profile } => {
@@ -451,9 +453,10 @@ pub async fn run(args: Args) {
 
                             if let Err(e) = agm.add_mods_to_preset(&game, &name, &selected_mods) {
                                 eprintln!("Error adding mods to preset: {}", e);
-                            } else {
-                                println!("Successfully added {} mods to preset '{}'.", selected_mods.len(), name);
+                                return;
                             }
+
+                            println!("Successfully added {} mods to preset '{}'.", selected_mods.len(), name);
                         }
                     }
                     Err(e) => {
@@ -471,9 +474,10 @@ pub async fn run(args: Args) {
             Preset::Remove { game, name } => {
                 if let Err(e) = agm.remove_preset(&game, &name) {
                     eprintln!("Error removing preset: {}", e);
-                } else {
-                    println!("Removed preset '{}' for game '{}'.", name, game);
+                    return;
                 }
+
+                println!("Removed preset '{}' for game '{}'.", name, game);
             }
         },
 
@@ -481,15 +485,17 @@ pub async fn run(args: Args) {
             if let Some(key) = cli_config_cmd.nexus_api_key {
                 if let Err(e) = agm.set_nexus_api_key(&key) {
                     eprintln!("Error setting Nexus API key: {}", e);
-                } else {
-                    println!("Nexus API key set successfully.");
+                    return;
                 }
+
+                println!("Nexus API key set successfully.");
             } else if let Some(editor) = cli_config_cmd.editor {
                 if let Err(e) = agm.set_editor(&editor) {
                     eprintln!("Error setting editor: {}", e);
-                } else {
-                    println!("Editor set successfully.");
+                    return;
                 }
+
+                println!("Editor set successfully.");
             } else {
                 eprintln!("Error: No configuration option specified.");
             }
@@ -551,10 +557,12 @@ pub async fn run(args: Args) {
                         for preset in &selected_presets {
                             if agm.is_preset_active(&profile_name, preset) {
                                 println!("Activating mod '{}' as it was added to the active preset '{}'.", mod_name, preset);
+                                
                                 if let Err(e) = agm.activate_mod(&profile_name, &mod_name) {
                                     eprintln!("Error activating mod: {}", e);
                                 }
-                                break; // Activate only once
+
+                                break;
                             }
                         }
                     }
@@ -564,11 +572,13 @@ pub async fn run(args: Args) {
             CliMod::Remove { name, purge } => {
                 if let Err(e) = agm.remove_mod(&name, purge) {
                     eprintln!("Error removing mod: {}", e);
-                } else {
-                    println!("Removed all references to mod '{}'.", name);
-                    if purge {
-                        println!("Purged mod '{}' from storage.", name);
-                    }
+                    return;
+                }
+
+                println!("Removed all references to mod '{}'.", name);
+                
+                if purge {
+                    println!("Purged mod '{}' from storage.", name);
                 }
             }
         }
