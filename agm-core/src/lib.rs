@@ -196,7 +196,7 @@ impl Agm {
         self.config.save()?;
     
         // Automatically create a "nomods" preset for the new profile
-        self.add_preset(game.clone(), "nomods".to_string(), None)?;
+        self.add_preset(game.clone(), "vanilla".to_string(), None)?;
     
         Ok(())
     }
