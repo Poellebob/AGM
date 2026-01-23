@@ -115,19 +115,7 @@ async fn handle_file(
         .and_then(|s| s.to_str())
         .unwrap_or("");
 
-    let mut should_unpack = false;
-    // Check if the current file's extension matches any of the archive mime types in the profile layout
-    if profile.layout.iter().any(|layout_node| {
-        layout_node.mime.as_ref().map_or(false, |mimes| {
-            mimes.iter().any(|mime_type| {
-                matches!(mime_type.as_str(), "zip" | "rar" | "7z" | "tar") && mime_type == file_extension
-            })
-        })
-    }) {
-        should_unpack = reporter.prompt_for_unpack(&file_name)?;
-    }
-
-    if should_unpack {
+    if reporter.prompt_for_unpack(&file_name)? {
         match file_extension {
             "zip" => unpack_zip(file_path, &storage_path, reporter).await?,
             "rar" => {
@@ -194,7 +182,8 @@ async fn handle_file(
     }
     
     let sidecar_path = storage_path.join(sidecar_filename);
-    let yaml_string = serde_yaml::to_string(&mod_spec).unwrap();
+    let yaml_string = serde_yaml::to_string(&mod_spec)
+        .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
     fs::write(sidecar_path, yaml_string)?;
 
     Ok(())

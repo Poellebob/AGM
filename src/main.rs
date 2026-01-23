@@ -1,8 +1,7 @@
 use cli::{Args, Parser};
 use dotenvy::dotenv;
 
-#[tokio::main]
-async fn main() {
+fn main() {
     dotenv().ok();
     let args = Args::parse();
 
@@ -23,10 +22,10 @@ async fn main() {
 
         #[cfg(all(not(feature = "tui"), not(feature = "gui")))]
         {
-            cli::run(args).await;
+            cli::run(args);
         }
         return;
     } else {
-        cli::run(args).await;
+        cli::run(args);
     }
 }

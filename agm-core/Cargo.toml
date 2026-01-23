@@ -17,6 +17,7 @@ sevenz-rust = "*"
 tar = "0.4.40"
 thiserror = "2.0.18"
 url = "2.5.0"
+once_cell = "1.19.0"
 
 [build-dependencies]
 serde = { version = "1.0", features = ["derive"] }

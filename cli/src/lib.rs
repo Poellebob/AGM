@@ -1,5 +1,7 @@
-use agm_core::{install::InstallReporter, Agm, run_url_handler};
-pub use clap::{CommandFactory, Parser, Subcommand};
+pub use clap::Parser;
+use agm_core::install::InstallReporter;
+use agm_core::Agm;
+use clap::{CommandFactory, Subcommand, ValueHint};
 use std::io::{self, Write};
 use std::path::Path;
 
@@ -13,10 +15,6 @@ pub struct Args {
     #[arg(long)]
     pub test: bool,
 
-    #[cfg(debug_assertions)]
-    #[arg(long)]
-    pub test_url_handle: bool,
-
     #[command(subcommand)]
     pub command: Option<Command>,
 }
@@ -29,37 +27,51 @@ pub enum Command {
     },
     Preset {
         #[command(subcommand)]
-        cmd: Preset,
+        cmd: CliPreset,
     },
-    /// Manage global application configuration
     Config(CliConfig),
     Mod {
         #[command(subcommand)]
         cmd: CliMod,
     },
+    #[command(hide = true)]
+    Completion {
+        #[command(subcommand)]
+        cmd: Completion,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum Completion {
+    Bash,
+    Zsh,
+    Fish,
+    PowerShell,
+    Elvish,
 }
 
 #[derive(Subcommand, Debug)]
 pub enum CliMod {
-    Install(Install),
+    Install(CliInstall),
     Remove {
+        #[arg(value_hint = ValueHint::Other)]
+        game: String,
+
         name: String,
+
         #[arg(long)]
         purge: bool,
     },
 }
 
 #[derive(Parser, Debug)]
-pub struct Install {
-    /// Profile to use
-    #[arg(long)]
+pub struct CliInstall {
+    #[arg(long, value_hint = ValueHint::Other)]
     pub profile: Option<String>,
 
-    /// Optional name for the mod
     #[arg(long)]
     pub name: Option<String>,
 
-    /// List of files to install
     #[arg(required = true)]
     pub files: Vec<String>,
 }
@@ -80,36 +92,44 @@ pub enum CliProfile {
     List,
 
     Add {
+        #[arg(value_hint = ValueHint::Other)]
         game: String,
         name: Option<String>,
         content: Option<String>,
     },
 
     Edit {
+        #[arg(value_hint = ValueHint::Other)]
         game: String,
         content: Option<String>,
     },
 
-    Remove { game: String },
+    Remove {
+        #[arg(value_hint = ValueHint::Other)]
+        game: String,
+    },
 }
 
 #[derive(Subcommand, Debug)]
-pub enum Preset {
+pub enum CliPreset {
     Reload {
+        #[arg(value_hint = ValueHint::Other)]
         game: String,
     },
 
     Switch {
+        #[arg(value_hint = ValueHint::Other)]
         game: String,
         preset: String,
     },
 
     List {
-        #[arg(long)]
+        #[arg(long, value_hint = ValueHint::Other)]
         profile: Option<String>,
     },
 
     Add {
+        #[arg(value_hint = ValueHint::Other)]
         game: String,
         name: String,
         content: Option<String>,
@@ -118,12 +138,14 @@ pub enum Preset {
     },
 
     Edit {
+        #[arg(value_hint = ValueHint::Other)]
         game: String,
         name: String,
         content: Option<String>,
     },
 
     Remove {
+        #[arg(value_hint = ValueHint::Other)]
         game: String,
         name: String,
     },
@@ -229,7 +251,10 @@ impl InstallReporter for CliInstallReporter {
     }
 
     fn prompt_for_mod_name(&self, default_name: &str) -> io::Result<String> {
-        print!("Enter a name for the mod (leave blank to use '{}'): ", default_name);
+        print!(
+            "Enter a name for the mod (leave blank to use '{}'): ",
+            default_name
+        );
         io::stdout().flush()?;
         let mut input = String::new();
         io::stdin().read_line(&mut input)?;
@@ -259,7 +284,7 @@ impl InstallReporter for CliInstallReporter {
         io::stdout().flush()?;
         let mut input = String::new();
         io::stdin().read_line(&mut input)?;
-        
+
         let selected_presets = input
             .split_whitespace()
             .filter_map(|s| s.parse::<usize>().ok())
@@ -286,16 +311,7 @@ impl InstallReporter for CliInstallReporter {
     }
 }
 
-pub async fn run(args: Args) {
-    #[cfg(debug_assertions)]
-    if args.test_url_handle {
-        println!("Running in test url handle mode.");
-        if let Err(e) = run_url_handler().await {
-            eprintln!("Error running url handler: {}", e);
-        }
-        return;
-    }
-
+pub fn run(args: Args) {
     let mut agm = match Agm::new() {
         Ok(agm) => agm,
         Err(e) => {
@@ -305,7 +321,42 @@ pub async fn run(args: Args) {
     };
 
     match args.command {
-        Some(Command::Profile { cmd: cli_profile_cmd }) => match cli_profile_cmd {
+        Some(Command::Completion { cmd: completion_cmd }) => {
+            let mut cmd = Args::command();
+            let bin_name = cmd.get_name().to_string();
+
+            if let Some(arg) = std::env::args().nth(3) {
+                if let Ok(agm) = Agm::new() {
+                    if arg == "profile" || arg == "game" {
+                        for profile in agm.get_profile_names() {
+                            println!("{}", profile);
+                        }
+                        return;
+                    }
+                }
+            }
+
+            match completion_cmd {
+                Completion::Bash => {
+                    clap_complete::generate(clap_complete::shells::Bash, &mut cmd, &bin_name, &mut io::stdout());
+                }
+                Completion::Zsh => {
+                    clap_complete::generate(clap_complete::shells::Zsh, &mut cmd, &bin_name, &mut io::stdout());
+                }
+                Completion::Fish => {
+                    clap_complete::generate(clap_complete::shells::Fish, &mut cmd, &bin_name, &mut io::stdout());
+                }
+                Completion::PowerShell => {
+                    clap_complete::generate(clap_complete::shells::PowerShell, &mut cmd, &bin_name, &mut io::stdout());
+                }
+                Completion::Elvish => {
+                    clap_complete::generate(clap_complete::shells::Elvish, &mut cmd, &bin_name, &mut io::stdout());
+                }
+            }
+        }
+        Some(Command::Profile {
+            cmd: cli_profile_cmd,
+        }) => match cli_profile_cmd {
             CliProfile::List => {
                 let profiles = agm.get_profile_names();
                 if profiles.is_empty() {
@@ -318,7 +369,11 @@ pub async fn run(args: Args) {
                 }
             }
 
-            CliProfile::Add { game, name, content } => {
+            CliProfile::Add {
+                game,
+                name,
+                content,
+            } => {
                 let game_path = if content.is_none() {
                     println!("Please enter the full path to the game's base dir:");
                     let mut game_path = String::new();
@@ -358,7 +413,7 @@ pub async fn run(args: Args) {
         },
 
         Some(Command::Preset { cmd }) => match cmd {
-            Preset::Reload { game } => {
+            CliPreset::Reload { game } => {
                 let names = agm.get_preset_names(&game);
                 let mut active = "".to_string();
 
@@ -381,7 +436,7 @@ pub async fn run(args: Args) {
                 }
             }
 
-            Preset::Switch { game, preset } => {
+            CliPreset::Switch { game, preset } => {
                 if let Err(e) = agm.switch_preset(&game, &preset) {
                     eprintln!("error switching preset: {}", e);
                     return;
@@ -390,7 +445,7 @@ pub async fn run(args: Args) {
                 println!("Switched to preset '{}' for game '{}'.", preset, game);
             }
 
-            Preset::List { profile } => {
+            CliPreset::List { profile } => {
                 let presets = agm.get_presets();
                 if let Some(game_name) = profile {
                     if let Some(preset_config) = presets.iter().find(|p| p.game == game_name) {
@@ -425,7 +480,12 @@ pub async fn run(args: Args) {
                 }
             }
 
-            Preset::Add { game, name, content, nomods } => {
+            CliPreset::Add {
+                game,
+                name,
+                content,
+                nomods,
+            } => {
                 if let Err(e) = agm.add_preset(game.clone(), name.clone(), content) {
                     eprintln!("Error adding preset: {}", e);
                     return;
@@ -456,7 +516,11 @@ pub async fn run(args: Args) {
                                 return;
                             }
 
-                            println!("Successfully added {} mods to preset '{}'.", selected_mods.len(), name);
+                            println!(
+                                "Successfully added {} mods to preset '{}'.",
+                                selected_mods.len(),
+                                name
+                            );
                         }
                     }
                     Err(e) => {
@@ -465,13 +529,17 @@ pub async fn run(args: Args) {
                 }
             }
 
-            Preset::Edit { game, name, content } => {
+            CliPreset::Edit {
+                game,
+                name,
+                content,
+            } => {
                 if let Err(e) = agm.edit_preset(&game, &name, content) {
                     eprintln!("Error editing preset: {}", e);
                 }
             }
 
-            Preset::Remove { game, name } => {
+            CliPreset::Remove { game, name } => {
                 if let Err(e) = agm.remove_preset(&game, &name) {
                     eprintln!("Error removing preset: {}", e);
                     return;
@@ -482,15 +550,15 @@ pub async fn run(args: Args) {
         },
 
         Some(Command::Config(cli_config_cmd)) => {
-            if let Some(key) = cli_config_cmd.nexus_api_key {
-                if let Err(e) = agm.set_nexus_api_key(&key) {
+            if let Some(key) = cli_config_cmd.nexus_api_key.as_deref() {
+                if let Err(e) = agm.set_nexus_api_key(key) {
                     eprintln!("Error setting Nexus API key: {}", e);
                     return;
                 }
 
                 println!("Nexus API key set successfully.");
-            } else if let Some(editor) = cli_config_cmd.editor {
-                if let Err(e) = agm.set_editor(&editor) {
+            } else if let Some(editor) = cli_config_cmd.editor.as_deref() {
+                if let Err(e) = agm.set_editor(editor) {
                     eprintln!("Error setting editor: {}", e);
                     return;
                 }
@@ -504,7 +572,7 @@ pub async fn run(args: Args) {
         Some(Command::Mod { cmd }) => match cmd {
             CliMod::Install(mut cmd) => {
                 let reporter = CliInstallReporter;
-                
+
                 let profile_name = match cmd.profile.take() {
                     Some(p) => p,
                     None => {
@@ -528,8 +596,10 @@ pub async fn run(args: Args) {
                         reporter.prompt_for_mod_name(&default_name).unwrap()
                     }
                 };
-                
-                if let Err(e) = agm.install_mods(&cmd.files, &profile_name, &mod_name, &reporter).await {
+
+                if let Err(e) = 
+                    agm.install_mods_blocking(&cmd.files, &profile_name, &mod_name, &reporter)
+                {
                     eprintln!("Error installing mods: {}", e);
                     return;
                 }
@@ -541,11 +611,13 @@ pub async fn run(args: Args) {
                         return;
                     }
                     if let Ok(selected_presets) = reporter.prompt_for_presets(&presets) {
-                        if selected_presets.is_empty() { 
-                            return; 
+                        if selected_presets.is_empty() {
+                            return;
                         }
 
-                        if let Err(e) = agm.add_mod_to_presets(&profile_name, &mod_name, &selected_presets) {
+                        if let Err(e) = 
+                            agm.add_mod_to_presets(&profile_name, &mod_name, &selected_presets)
+                        {
                             eprintln!("Error adding mod to presets: {}", e);
                         } else {
                             for preset in &selected_presets {
@@ -557,7 +629,7 @@ pub async fn run(args: Args) {
                         for preset in &selected_presets {
                             if agm.is_preset_active(&profile_name, preset) {
                                 println!("Activating mod '{}' as it was added to the active preset '{}'.", mod_name, preset);
-                                
+
                                 if let Err(e) = agm.activate_mod(&profile_name, &mod_name) {
                                     eprintln!("Error activating mod: {}", e);
                                 }
@@ -569,19 +641,19 @@ pub async fn run(args: Args) {
                 }
             }
 
-            CliMod::Remove { name, purge } => {
-                if let Err(e) = agm.remove_mod(&name, purge) {
+            CliMod::Remove { game, name, purge } => {
+                if let Err(e) = agm.remove_mod(&game, &name, purge) {
                     eprintln!("Error removing mod: {}", e);
                     return;
                 }
 
-                println!("Removed all references to mod '{}'.", name);
-                
+                println!("Removed mod '{}' from game '{}' profile.", name, game);
+
                 if purge {
-                    println!("Purged mod '{}' from storage.", name);
+                    println!("Purged mod '{}' from storage for game '{}'.", name, game);
                 }
             }
-        }
+        },
 
         None => {
             Args::command().print_help().unwrap();

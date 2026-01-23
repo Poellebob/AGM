@@ -1,3 +1,4 @@
+pub mod async_runtime;
 pub mod config;
 pub mod install;
 pub mod ipc;
@@ -96,6 +97,17 @@ impl Agm {
         reporter: &dyn InstallReporter,
     ) -> std::io::Result<()> {
         core_install_mods(files, profile_name, mod_name, reporter).await
+    }
+
+    /// Blocking version of install_mods that handles its own tokio runtime
+    pub fn install_mods_blocking(
+        &self,
+        files: &[String],
+        profile_name: &str,
+        mod_name: &str,
+        reporter: &dyn InstallReporter,
+    ) -> std::io::Result<()> {
+        async_runtime::run_blocking(core_install_mods(files, profile_name, mod_name, reporter))
     }
 
     pub fn activate_mod(&self, game: &str, mod_name: &str) -> Result<Vec<(PathBuf, PathBuf)>, Error> {
@@ -369,30 +381,33 @@ impl Agm {
         Ok(())
     }
 
-    pub fn remove_mod(&mut self, name: &str, purge: bool) -> Result<(), Error> {
-        for preset_config in &self.config.presets {
-            for preset_name in &preset_config.presets {
-                let preset_path = Config::get_data_dir()?.join("presets").join(&preset_config.game).join(format!("{}.yaml", preset_name));
-                if !preset_path.exists() {
-                    continue;
-                }
+    pub fn remove_mod(&mut self, game: &str, name: &str, purge: bool) -> Result<(), Error> {
+        // Find the preset configuration for the specified game
+        let preset_config = self.config.presets.iter()
+            .find(|pc| pc.game == game)
+            .ok_or_else(|| Error::ProfileNotFound(format!("Game '{}'", game)))?;
 
-                let mut preset = Preset::from_file(&preset_path);
-                preset.mods.retain(|m| match m {
-                    crate::preset::Mod::Simple(mod_name) => mod_name != name,
-                    crate::preset::Mod::Detailed(info) => info.name != name,
-                });
-                let yaml_string = serde_yaml::to_string(&preset)?;
-                std::fs::write(&preset_path, yaml_string)?;
+        // Remove mod from all presets for this specific game
+        for preset_name in &preset_config.presets {
+            let preset_path = Config::get_data_dir()?.join("presets").join(game).join(format!("{}.yaml", preset_name));
+            if !preset_path.exists() {
+                continue;
             }
+
+            let mut preset = Preset::from_file(&preset_path);
+            preset.mods.retain(|m| match m {
+                crate::preset::Mod::Simple(mod_name) => mod_name != name,
+                crate::preset::Mod::Detailed(info) => info.name != name,
+            });
+            let yaml_string = serde_yaml::to_string(&preset)?;
+            std::fs::write(&preset_path, yaml_string)?;
         }
 
+        // If purge is requested, remove mod from storage for this specific game only
         if purge {
-            for preset_config in &self.config.presets {
-                let mod_storage_path = Config::get_data_dir()?.join("storage").join(&preset_config.game).join(name);
-                if mod_storage_path.exists() {
-                    fs::remove_dir_all(mod_storage_path)?;
-                }
+            let mod_storage_path = Config::get_data_dir()?.join("storage").join(game).join(name);
+            if mod_storage_path.exists() {
+                fs::remove_dir_all(mod_storage_path)?;
             }
         }
         
@@ -535,4 +550,9 @@ pub async fn run_url_handler() -> Result<(), Box<dyn std::error::Error + Send>> 
     ipc_server_handle
         .await
         .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?
+}
+
+/// Blocking version of run_url_handler that handles its own tokio runtime
+pub fn run_url_handler_blocking() -> Result<(), Box<dyn std::error::Error + Send>> {
+    async_runtime::run_blocking(run_url_handler())
 }

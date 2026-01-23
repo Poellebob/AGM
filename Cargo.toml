@@ -17,7 +17,6 @@ agm_core = { path = "./agm-core" }
 cli     = { path = "./cli", optional = true }
 tui     = { path = "./tui", optional = true }
 gui     = { path = "./gui", optional = true }
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 dotenvy = "0.15.7"
 
 [features]
