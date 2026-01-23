@@ -1,0 +1,101 @@
+AGM - A Generic Mod-manager Agent Configuration
+
+## Core Architecture
+
+### Primary Agent: Core Logic Manager
+- Responsible for agm-core functionality
+- Handles Profile, Preset, and ModSpec data structures
+- Manages core mod installation logic
+- Processes file extraction and symlink creation
+- Implements Nexus API integration
+- Handles IPC communication via agm.sock
+
+### Secondary Agents
+
+#### CLI Agent
+- Implements InstallReporter trait for command-line interface
+- Handles user interaction and prompts
+- Uses clap for argument parsing
+- Processes URL scheme handling (nxm://)
+- Manages profile and preset command stubs
+
+#### TUI Agent
+- Terminal user interface implementation
+- Requires InstallReporter trait implementation
+- Planned for terminal-based mod management
+
+#### GUI Agent
+- Graphical user interface implementation
+- Requires InstallReporter trait implementation
+- Planned for visual mod management
+
+#### URL Handler Agent
+- Manages nxm:// URL scheme registration
+- Handles download link fetching via Nexus API
+- Communicates with main process via IPC
+
+## Configuration Management
+
+### Config Agent
+- Manages ~/.config/AGM/config.yaml
+- Handles nexus_api_key storage
+- Manages profiles and presets lists
+- Ensures directory structure exists
+
+### Storage Agent
+- Manages ~/.local/share/AGM storage
+- Handles mod file storage organization
+- Maintains symlink structure for game directories
+
+## Core Data Structures
+
+### Profile Management
+- YAML-based game profile definitions
+- Handles game installation paths
+- Manages Moddir configurations
+
+### Preset Management
+- YAML-based mod collection definitions
+- Includes download URLs and file placement
+- Simplified structure in current implementation
+
+### ModSpec Generation
+- Sidecar YAML files for installed mods
+- Automatic file placement guessing
+- MIME type-based path resolution
+
+## Inter-Process Communication
+
+### IPC Channel
+- Socket-based communication (agm.sock)
+- Frontend-backend coordination
+- Background process management
+
+## File Management Strategy
+
+### Symlink System
+- Minimal file duplication
+- Instant mod activation/deactivation
+- Centralized storage with game directory links
+- Disk space optimization
+
+## Current Implementation Status
+
+### Completed
+- Core architecture foundation
+- agm-core module structure
+- Basic CLI implementation
+- Mod installation pipeline
+- Configuration management
+- IPC framework
+
+### In Progress
+- Profile and preset management
+- TUI interface implementation
+- GUI interface development
+
+### Future Development
+- Enhanced Nexus integration
+- Advanced preset features
+- Multi-platform compatibility
+- Performance optimizations

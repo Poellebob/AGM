@@ -9,7 +9,7 @@ pub mod profile;
 pub mod symlink;
 
 use crate::install::{install_mods as core_install_mods, InstallReporter};
-use crate::config::{Config, PresetConfig};
+use crate::config::{Config, GameConfig};
 use crate::ipc::{start_ipc_server, create_url_channel};
 use std::env;
 use std::fs;
@@ -85,8 +85,48 @@ pub struct Agm {
 impl Agm {
     pub fn new() -> Result<Self, Error> {
         Config::ensure_config_dirs()?;
-        let config = Config::load()?;
+        let mut config = Config::load()?;
+        
+        // Sync mods from storage on startup
+        Self::sync_mods_from_storage(&mut config)?;
+        
         Ok(Self { config })
+    }
+
+    /// Sync mods from storage directories to config
+    fn sync_mods_from_storage(config: &mut Config) -> Result<(), Error> {
+        let storage_path = Config::get_data_dir()?.join("storage");
+        if !storage_path.exists() {
+            return Ok(());
+        }
+
+        for game_dir in fs::read_dir(storage_path)? {
+            let game_dir = game_dir?;
+            if !game_dir.file_type()?.is_dir() {
+                continue;
+            }
+
+            if let Some(game_name) = game_dir.file_name().to_str() {
+                let mut storage_mods = Vec::new();
+                
+                // Scan storage for mods
+                for mod_entry in fs::read_dir(game_dir.path())? {
+                    let mod_entry = mod_entry?;
+                    if mod_entry.file_type()?.is_dir() {
+                        if let Some(mod_name) = mod_entry.file_name().to_str() {
+                            storage_mods.push(mod_name.to_string());
+                        }
+                    }
+                }
+
+                // Update config with discovered mods
+                let game_config = config.get_or_create_game(game_name);
+                game_config.mods = storage_mods;
+            }
+        }
+
+        config.save()?;
+        Ok(())
     }
 
     pub async fn install_mods(
@@ -152,11 +192,11 @@ impl Agm {
     }
 
     pub fn get_profile_names(&self) -> Vec<String> {
-        self.config.profiles.clone()
+        self.config.get_profile_names()
     }
 
     fn get_profile_by_name(&self, name: &str) -> Result<Option<Profile>, Error> {
-        if self.config.profiles.iter().any(|p| p == name) {
+        if self.config.games.iter().any(|g| g.profile == name) {
             let profile_path = Config::get_data_dir()?.join("profiles").join(format!("{}.yaml", name));
             if profile_path.exists() {
                 return Ok(Some(Profile::from_file(&profile_path)));
@@ -192,10 +232,11 @@ impl Agm {
         
         std::fs::write(&profile_path, &content_to_write)?;
     
-        self.config.profiles.push(profile_name.clone());
+        // Add to new games structure
+        self.config.get_or_create_game(&profile_name);
         self.config.save()?;
     
-        // Automatically create a "nomods" preset for the new profile
+        // Automatically create a "vanilla" preset for the new profile
         self.add_preset(game.clone(), "vanilla".to_string(), None)?;
     
         Ok(())
@@ -229,11 +270,16 @@ impl Agm {
         Ok(mods)
     }
 
+    /// Get mods for a game from config (fast lookup from tracked mods)
+    pub fn get_mods(&self, game: &str) -> Vec<String> {
+        self.config.get_mods_for_game(game)
+    }
+
     pub fn remove_profile(&mut self, name: &str, remove_presets: bool, remove_mods: bool) -> Result<(), Error> {
         if remove_presets {
-            if let Some(preset_config) = self.config.presets.iter().find(|p| p.game == name) {
-                for preset in preset_config.presets.clone() {
-                    self.remove_preset(name, &preset)?;
+            if let Some(game_config) = self.config.get_game(name) {
+                for preset in &game_config.presets.clone() {
+                    self.remove_preset(name, preset)?;
                 }
             }
         }
@@ -250,27 +296,27 @@ impl Agm {
             std::fs::remove_file(profile_path)?;
         }
         
-        self.config.profiles.retain(|p| p != name);
+        self.config.remove_game(name);
         self.config.save()?;
         
         Ok(())
     }
 
-    pub fn get_presets(&self) -> &Vec<PresetConfig> {
-        &self.config.presets
+    pub fn get_presets(&self) -> &Vec<GameConfig> {
+        &self.config.games
     }
 
     pub fn get_preset_names(&self, game: &str) -> Vec<String> {
-        if let Some(preset_config) = self.config.presets.iter().find(|p| p.game == game) {
-            preset_config.presets.clone()
+        if let Some(game_config) = self.config.get_game(game) {
+            game_config.presets.clone()
         } else {
             Vec::new()
         }
     }
 
     pub fn is_preset_active(&self, game: &str, preset: &str) -> bool {
-        if let Some(preset_config) = self.config.presets.iter().find(|p| p.game == game) {
-            preset_config.active_preset.as_deref() == Some(preset)
+        if let Some(game_config) = self.config.get_game(game) {
+            game_config.active_preset.as_deref() == Some(preset)
         } else {
             false
         }
@@ -291,16 +337,7 @@ impl Agm {
         let new_preset = crate::preset::Preset::new(&name);
         let yaml_string = serde_yaml::to_string(&new_preset)?;
         
-        if let Some(preset_config) = self.config.presets.iter_mut().find(|p| p.game == game) {
-            preset_config.presets.push(name.clone());
-        } else {
-            self.config.presets.push(config::PresetConfig {
-                game: game.clone(),
-                aliases: vec![],
-                presets: vec![name.clone()],
-                active_preset: None,
-            });
-        }
+        self.config.add_preset_to_game(&game, &name);
         self.config.save()?;
 
         let editor = get_editor(&self.config);
@@ -325,8 +362,8 @@ impl Agm {
 
         if is_active {
             self.deactivate_preset(game)?;
-            if let Some(preset_config) = self.config.presets.iter_mut().find(|p| p.game == game) {
-                preset_config.active_preset = None;
+            if let Some(game_config) = self.config.get_game_mut(game) {
+                game_config.active_preset = None;
             }
         }
 
@@ -335,9 +372,7 @@ impl Agm {
             std::fs::remove_file(preset_path)?;
         }
 
-        if let Some(preset_config) = self.config.presets.iter_mut().find(|p| p.game == game) {
-            preset_config.presets.retain(|p| p != name);
-        }
+        self.config.remove_preset_from_game(game, name);
 
         self.config.save()?;
         Ok(())
@@ -382,13 +417,12 @@ impl Agm {
     }
 
     pub fn remove_mod(&mut self, game: &str, name: &str, purge: bool) -> Result<(), Error> {
-        // Find the preset configuration for the specified game
-        let preset_config = self.config.presets.iter()
-            .find(|pc| pc.game == game)
+        // Find the game configuration for the specified game
+        let game_config = self.config.get_game(game)
             .ok_or_else(|| Error::ProfileNotFound(format!("Game '{}'", game)))?;
 
         // Remove mod from all presets for this specific game
-        for preset_name in &preset_config.presets {
+        for preset_name in &game_config.presets {
             let preset_path = Config::get_data_dir()?.join("presets").join(game).join(format!("{}.yaml", preset_name));
             if !preset_path.exists() {
                 continue;
@@ -402,6 +436,10 @@ impl Agm {
             let yaml_string = serde_yaml::to_string(&preset)?;
             std::fs::write(&preset_path, yaml_string)?;
         }
+
+        // Remove from config
+        self.config.remove_mod_from_game(game, name);
+        self.config.save()?;
 
         // If purge is requested, remove mod from storage for this specific game only
         if purge {
@@ -418,14 +456,14 @@ impl Agm {
         self.deactivate_preset(game)?;
         self.activate_preset(game, preset)?;
         
-        if let Some(preset_config) = self.config.presets.iter_mut().find(|p| p.game == game) {
-            preset_config.active_preset = Some(preset.to_string());
+        if let Some(game_config) = self.config.get_game_mut(game) {
+            game_config.active_preset = Some(preset.to_string());
         } else {
             // This case should ideally not be hit if `activate_preset` was successful, but as a fallback:
-            self.config.presets.push(config::PresetConfig {
-                game: game.to_string(),
-                aliases: vec![],
+            self.config.games.push(config::GameConfig {
+                profile: game.to_string(),
                 presets: vec![preset.to_string()],
+                mods: vec![],
                 active_preset: Some(preset.to_string()),
             });
         }
@@ -436,8 +474,8 @@ impl Agm {
     
     fn deactivate_preset(&mut self, game: &str) -> Result<Vec<PathBuf>, Error> {
         let mut removed_symlinks = vec![];
-        if let Some(preset_config) = self.config.presets.iter().find(|p| p.game == game) {
-            if let Some(active_preset_name) = &preset_config.active_preset {
+        if let Some(game_config) = self.config.get_game(game) {
+            if let Some(active_preset_name) = &game_config.active_preset {
                 let profile = self.get_profile_by_name(game)?.ok_or_else(|| Error::ProfileNotFound(game.to_string()))?;
 
                 let preset_path = Config::get_data_dir()?.join("presets").join(game).join(format!("{}.yaml", active_preset_name));

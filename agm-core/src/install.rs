@@ -216,5 +216,10 @@ pub async fn install_mods(
         handle_file(&file_path, &profile, reporter, &data_dir, mod_name).await?;
     }
 
+    // Add mod to config after successful installation
+    let mut config = Config::load().map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+    config.add_mod_to_game(profile_name, mod_name);
+    config.save().map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+
     Ok(())
 }

@@ -135,22 +135,14 @@ files:
 This normaly should not be touched
 
 ```yaml
-profile:
-- game1
-- game2
-preset:
-- game: game1
-  alias:
-  - G1
-  - Game1
+games:
+- profile: game
   presets:
-    modpak1
-    modpak2
-- game: game2
-  alias:
-  - Ga2
-  presets:
-    modpak1
+  - modpack1
+  - modpack2
+  mods:
+  - mod1
+  - mod2
 ```
 
 

@@ -1,6 +1,6 @@
-pub use clap::Parser;
 use agm_core::install::InstallReporter;
 use agm_core::Agm;
+pub use clap::Parser;
 use clap::{CommandFactory, Subcommand, ValueHint};
 use std::io::{self, Write};
 use std::path::Path;
@@ -61,6 +61,10 @@ pub enum CliMod {
 
         #[arg(long)]
         purge: bool,
+    },
+    List {
+        #[arg(value_hint = ValueHint::Other)]
+        game: String,
     },
 }
 
@@ -321,7 +325,9 @@ pub fn run(args: Args) {
     };
 
     match args.command {
-        Some(Command::Completion { cmd: completion_cmd }) => {
+        Some(Command::Completion {
+            cmd: completion_cmd,
+        }) => {
             let mut cmd = Args::command();
             let bin_name = cmd.get_name().to_string();
 
@@ -338,19 +344,44 @@ pub fn run(args: Args) {
 
             match completion_cmd {
                 Completion::Bash => {
-                    clap_complete::generate(clap_complete::shells::Bash, &mut cmd, &bin_name, &mut io::stdout());
+                    clap_complete::generate(
+                        clap_complete::shells::Bash,
+                        &mut cmd,
+                        &bin_name,
+                        &mut io::stdout(),
+                    );
                 }
                 Completion::Zsh => {
-                    clap_complete::generate(clap_complete::shells::Zsh, &mut cmd, &bin_name, &mut io::stdout());
+                    clap_complete::generate(
+                        clap_complete::shells::Zsh,
+                        &mut cmd,
+                        &bin_name,
+                        &mut io::stdout(),
+                    );
                 }
                 Completion::Fish => {
-                    clap_complete::generate(clap_complete::shells::Fish, &mut cmd, &bin_name, &mut io::stdout());
+                    clap_complete::generate(
+                        clap_complete::shells::Fish,
+                        &mut cmd,
+                        &bin_name,
+                        &mut io::stdout(),
+                    );
                 }
                 Completion::PowerShell => {
-                    clap_complete::generate(clap_complete::shells::PowerShell, &mut cmd, &bin_name, &mut io::stdout());
+                    clap_complete::generate(
+                        clap_complete::shells::PowerShell,
+                        &mut cmd,
+                        &bin_name,
+                        &mut io::stdout(),
+                    );
                 }
                 Completion::Elvish => {
-                    clap_complete::generate(clap_complete::shells::Elvish, &mut cmd, &bin_name, &mut io::stdout());
+                    clap_complete::generate(
+                        clap_complete::shells::Elvish,
+                        &mut cmd,
+                        &bin_name,
+                        &mut io::stdout(),
+                    );
                 }
             }
         }
@@ -402,7 +433,8 @@ pub fn run(args: Args) {
 
             CliProfile::Remove { game } => {
                 let reporter = CliInstallReporter;
-                if let Ok((remove_presets, remove_mods)) = reporter.confirm_profile_parts_removal() {
+                if let Ok((remove_presets, remove_mods)) = reporter.confirm_profile_parts_removal()
+                {
                     if let Err(e) = agm.remove_profile(&game, remove_presets, remove_mods) {
                         eprintln!("Error removing profile: {}", e);
                     } else {
@@ -448,7 +480,7 @@ pub fn run(args: Args) {
             CliPreset::List { profile } => {
                 let presets = agm.get_presets();
                 if let Some(game_name) = profile {
-                    if let Some(preset_config) = presets.iter().find(|p| p.game == game_name) {
+                    if let Some(preset_config) = presets.iter().find(|p| p.profile == game_name) {
                         println!("Presets for {}:", game_name);
                         for preset in &preset_config.presets {
                             if Some(preset) == preset_config.active_preset.as_ref() {
@@ -468,7 +500,7 @@ pub fn run(args: Args) {
 
                     println!("All configured presets:");
                     for preset_config in presets {
-                        println!("- {}:", preset_config.game);
+                        println!("- {}:", preset_config.profile);
                         for preset in &preset_config.presets {
                             if Some(preset) == preset_config.active_preset.as_ref() {
                                 println!("    - {} (active)", preset);
@@ -597,7 +629,7 @@ pub fn run(args: Args) {
                     }
                 };
 
-                if let Err(e) = 
+                if let Err(e) =
                     agm.install_mods_blocking(&cmd.files, &profile_name, &mod_name, &reporter)
                 {
                     eprintln!("Error installing mods: {}", e);
@@ -615,7 +647,7 @@ pub fn run(args: Args) {
                             return;
                         }
 
-                        if let Err(e) = 
+                        if let Err(e) =
                             agm.add_mod_to_presets(&profile_name, &mod_name, &selected_presets)
                         {
                             eprintln!("Error adding mod to presets: {}", e);
@@ -651,6 +683,18 @@ pub fn run(args: Args) {
 
                 if purge {
                     println!("Purged mod '{}' from storage for game '{}'.", name, game);
+                }
+            }
+
+            CliMod::List { game } => {
+                let mods = agm.get_mods(&game);
+                if mods.is_empty() {
+                    println!("No mods found for game '{}'.", game);
+                } else {
+                    println!("Mods for game '{}':", game);
+                    for mod_name in mods {
+                        println!("  - {}", mod_name);
+                    }
                 }
             }
         },
