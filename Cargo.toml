@@ -14,14 +14,13 @@ members = [
 
 [dependencies]
 agm_core = { path = "./agm-core" }
-cli     = { path = "./cli", optional = true }
+cli     = { path = "./cli"}
 tui     = { path = "./tui", optional = true }
 gui     = { path = "./gui", optional = true }
 dotenvy = "0.15.7"
 
 [features]
-default = ["cli"]
-cli = ["dep:cli"]
-tui = ["dep:tui", "cli"]
-gui = ["dep:gui", "cli"]
+default = ["gui"]
+tui = ["dep:tui"]
+gui = ["dep:gui"]
 
