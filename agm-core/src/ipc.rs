@@ -14,12 +14,10 @@ use tokio::sync::mpsc;
 pub type UrlSender = mpsc::UnboundedSender<UrlMessage>;
 pub type UrlReceiver = mpsc::UnboundedReceiver<UrlMessage>;
 
-/// Creates a channel for URL messages
 pub fn create_url_channel() -> (UrlSender, UrlReceiver) {
     mpsc::unbounded_channel()
 }
 
-/// Starts the IPC server that listens for URLs from agm-url-handler
 pub async fn start_ipc_server(
     url_sender: UrlSender,
     _port: u16, // port is no longer used, but kept for compatibility with calling code

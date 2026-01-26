@@ -93,7 +93,7 @@ impl Agm {
         Ok(Self { config })
     }
 
-    /// Sync mods from storage directories to config
+    
     fn sync_mods_from_storage(config: &mut Config) -> Result<(), Error> {
         let storage_path = Config::get_data_dir()?.join("storage");
         if !storage_path.exists() {
@@ -102,32 +102,43 @@ impl Agm {
 
         for game_dir in fs::read_dir(storage_path)? {
             let game_dir = game_dir?;
+
             if !game_dir.file_type()?.is_dir() {
                 continue;
             }
 
-            if let Some(game_name) = game_dir.file_name().to_str() {
-                let mut storage_mods = Vec::new();
-                
-                // Scan storage for mods
-                for mod_entry in fs::read_dir(game_dir.path())? {
-                    let mod_entry = mod_entry?;
-                    if mod_entry.file_type()?.is_dir() {
-                        if let Some(mod_name) = mod_entry.file_name().to_str() {
-                            storage_mods.push(mod_name.to_string());
-                        }
-                    }
+            let game_name = game_dir.file_name().to_str().map(|s| s.to_owned());
+            let Some(game_name) = game_name else {
+                continue;
+            };
+
+            let mut storage_mods = Vec::new();
+
+            // Scan storage for mods
+            for mod_entry in fs::read_dir(game_dir.path())? {
+                let mod_entry = mod_entry?;
+
+                if !mod_entry.file_type()?.is_dir() {
+                    continue;
                 }
 
-                // Update config with discovered mods
-                let game_config = config.get_or_create_game(game_name);
-                game_config.mods = storage_mods;
+                let mod_name = mod_entry.file_name().to_str().map(|s| s.to_owned());
+                let Some(mod_name) = mod_name else {
+                    continue;
+                };
+
+                storage_mods.push(mod_name.to_string());
             }
+
+            // Update config with discovered mods
+            let game_config = config.get_or_create_game(&game_name);
+            game_config.mods = storage_mods;
         }
 
         config.save()?;
         Ok(())
     }
+
 
     pub async fn install_mods(
         &self,
@@ -139,7 +150,6 @@ impl Agm {
         core_install_mods(files, profile_name, mod_name, reporter).await
     }
 
-    /// Blocking version of install_mods that handles its own tokio runtime
     pub fn install_mods_blocking(
         &self,
         files: &[String],
@@ -155,22 +165,30 @@ impl Agm {
 
         let storage_path = Config::get_data_dir()?.join("storage").join(game).join(mod_name);
         let mod_spec_path = storage_path.join(format!("{}.yaml", mod_name));
+
+        if !mod_spec_path.exists() {
+            return Ok(vec![]);
+        }
+
         let mut symlinks = vec![];
 
-        if mod_spec_path.exists() {
-            let mod_spec: crate::mod_spec::ModSpec = serde_yaml::from_str(&std::fs::read_to_string(&mod_spec_path)?)?;
-            for file_entry in &mod_spec.files {
-                if file_entry.point.is_empty() {
-                    return Ok(vec![]);
-                }
-
-                if let Some(dest_dir_suffix) = profile.resolve_point(&file_entry.point) {
-                    let source_path = storage_path.join(&file_entry.target);
-                    let dest_path = Path::new(&profile.game.path).join(dest_dir_suffix).join(&file_entry.target);
-                    crate::symlink::create_symlink(&source_path, &dest_path)?;
-                    symlinks.push((source_path, dest_path));
-                }
+        let mod_spec: crate::mod_spec::ModSpec = serde_yaml::from_str(&std::fs::read_to_string(&mod_spec_path)?)?;
+        for file_entry in &mod_spec.files {
+            if file_entry.point.is_empty() {
+                return Ok(vec![]);
             }
+
+            let Some(dest_dir_suffix) = profile.resolve_point(&file_entry.point) else {
+                continue;
+            };
+
+            let source_path = storage_path.join(&file_entry.target);
+            let dest_path = Path::new(&profile.game.path)
+                .join(dest_dir_suffix)
+                .join(&file_entry.target);
+
+            crate::symlink::create_symlink(&source_path, &dest_path)?;
+            symlinks.push((source_path, dest_path));
         }
         Ok(symlinks)
     }
@@ -416,25 +434,38 @@ impl Agm {
         Ok(())
     }
 
+    pub fn remove_mod_from_preset(
+        &mut self, 
+        game: &str, 
+        preset: &str,
+        name: &str
+    ) -> Result<(), Error> {
+        let _game_config = self.config.get_game(game)
+            .ok_or_else(|| Error::ProfileNotFound(format!("Game '{}'", game)))?;
+
+        let preset_path = Config::get_data_dir()?.join("presets").join(game).join(format!("{}.yaml", preset));
+        if !preset_path.exists() {
+            return Ok(());
+        }
+
+        let mut preset = Preset::from_file(&preset_path);
+        preset.mods.retain(|m| match m {
+            crate::preset::Mod::Simple(mod_name) => mod_name != name,
+            crate::preset::Mod::Detailed(info) => info.name != name,
+        });
+        let yaml_string = serde_yaml::to_string(&preset)?;
+        std::fs::write(&preset_path, yaml_string)?;
+        Ok(())
+    }
+
     pub fn remove_mod(&mut self, game: &str, name: &str, purge: bool) -> Result<(), Error> {
         // Find the game configuration for the specified game
         let game_config = self.config.get_game(game)
             .ok_or_else(|| Error::ProfileNotFound(format!("Game '{}'", game)))?;
 
-        // Remove mod from all presets for this specific game
-        for preset_name in &game_config.presets {
-            let preset_path = Config::get_data_dir()?.join("presets").join(game).join(format!("{}.yaml", preset_name));
-            if !preset_path.exists() {
-                continue;
-            }
-
-            let mut preset = Preset::from_file(&preset_path);
-            preset.mods.retain(|m| match m {
-                crate::preset::Mod::Simple(mod_name) => mod_name != name,
-                crate::preset::Mod::Detailed(info) => info.name != name,
-            });
-            let yaml_string = serde_yaml::to_string(&preset)?;
-            std::fs::write(&preset_path, yaml_string)?;
+        let presets = game_config.presets.clone();
+        for preset in &presets {
+            self.remove_mod_from_preset(game, preset, name)?;
         }
 
         // Remove from config
@@ -452,14 +483,12 @@ impl Agm {
         Ok(())
     }
 
+    
     pub fn switch_preset(&mut self, game: &str, preset: &str) -> Result<(), Error> {
         self.deactivate_preset(game)?;
         self.activate_preset(game, preset)?;
-        
-        if let Some(game_config) = self.config.get_game_mut(game) {
-            game_config.active_preset = Some(preset.to_string());
-        } else {
-            // This case should ideally not be hit if `activate_preset` was successful, but as a fallback:
+
+        if self.config.get_game(game).is_none() {
             self.config.games.push(config::GameConfig {
                 profile: game.to_string(),
                 presets: vec![preset.to_string()],
@@ -468,53 +497,88 @@ impl Agm {
             });
         }
 
+        let game_config = self
+            .config
+            .get_game_mut(game)
+            .expect("game was just inserted");
+
+        game_config.active_preset = Some(preset.to_string());
+
         self.config.save()?;
         Ok(())
     }
+
     
+
     fn deactivate_preset(&mut self, game: &str) -> Result<Vec<PathBuf>, Error> {
         let mut removed_symlinks = vec![];
-        if let Some(game_config) = self.config.get_game(game) {
-            if let Some(active_preset_name) = &game_config.active_preset {
-                let profile = self.get_profile_by_name(game)?.ok_or_else(|| Error::ProfileNotFound(game.to_string()))?;
 
-                let preset_path = Config::get_data_dir()?.join("presets").join(game).join(format!("{}.yaml", active_preset_name));
-                let preset = Preset::from_file(&preset_path);
+        let game_config = match self.config.get_game(game) {
+            Some(gc) => gc,
+            None => return Ok(removed_symlinks),
+        };
 
-                for mod_entry in &preset.mods {
-                    let mod_name = match mod_entry {
-                        preset::Mod::Simple(name) => name,
-                        preset::Mod::Detailed(info) => &info.name,
-                    };
-                    let mod_spec_path = Config::get_data_dir()?.join("storage").join(game).join(mod_name).join(format!("{}.yaml", mod_name));
-                    
-                    if !mod_spec_path.exists() {
-                        continue;
-                    }
-                    
-                    let mod_spec: crate::mod_spec::ModSpec = serde_yaml::from_str(&std::fs::read_to_string(&mod_spec_path)?)?;
-                    for file_entry in &mod_spec.files {
-                        if file_entry.point.is_empty() {
-                            continue;
-                        }
+        let active_preset_name = match &game_config.active_preset {
+            Some(name) => name,
+            None => return Ok(removed_symlinks),
+        };
 
-                        if let Some(dest_dir_suffix) = profile.resolve_point(&file_entry.point) {
-                            let dest_path = Path::new(&profile.game.path).join(dest_dir_suffix).join(&file_entry.target);
-                            if !dest_path.exists() {
-                                continue;
-                            }
+        let profile = self
+            .get_profile_by_name(game)?
+            .ok_or_else(|| Error::ProfileNotFound(game.to_string()))?;
 
-                            if dest_path.is_symlink() {
-                                std::fs::remove_file(&dest_path)?;
-                                removed_symlinks.push(dest_path);
-                            }
-                        }
-                    }
-                }
+        let preset_path = Config::get_data_dir()?
+            .join("presets")
+            .join(game)
+            .join(format!("{}.yaml", active_preset_name));
+
+        let preset = Preset::from_file(&preset_path);
+
+        for mod_entry in &preset.mods {
+            let mod_name = match mod_entry {
+                preset::Mod::Simple(name) => name,
+                preset::Mod::Detailed(info) => &info.name,
+            };
+
+            let mod_spec_path = Config::get_data_dir()?
+                .join("storage")
+                .join(game)
+                .join(mod_name)
+                .join(format!("{}.yaml", mod_name));
+
+            if !mod_spec_path.exists() {
+                continue;
+            }
+
+            let mod_spec: crate::mod_spec::ModSpec =
+            serde_yaml::from_str(&std::fs::read_to_string(&mod_spec_path)?)?;
+
+            for file_entry in &mod_spec.files {
+            if file_entry.point.is_empty() {
+                continue;
+            }
+
+            let dest_dir_suffix = match profile.resolve_point(&file_entry.point) {
+                Some(p) => p,
+                None => continue,
+            };
+
+            let dest_path = Path::new(&profile.game.path)
+                .join(dest_dir_suffix)
+                .join(&file_entry.target);
+
+            if !dest_path.exists() || !dest_path.is_symlink() {
+                continue;
+            }
+
+            std::fs::remove_file(&dest_path)?;
+                removed_symlinks.push(dest_path);
             }
         }
+
         Ok(removed_symlinks)
     }
+
 
     fn activate_preset(&mut self, game: &str, preset_name: &str) -> Result<Vec<(PathBuf, PathBuf)>, Error> {
         let _profile = self.get_profile_by_name(game)?.ok_or_else(|| Error::ProfileNotFound(game.to_string()))?;
@@ -588,9 +652,4 @@ pub async fn run_url_handler() -> Result<(), Box<dyn std::error::Error + Send>> 
     ipc_server_handle
         .await
         .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)?
-}
-
-/// Blocking version of run_url_handler that handles its own tokio runtime
-pub fn run_url_handler_blocking() -> Result<(), Box<dyn std::error::Error + Send>> {
-    async_runtime::run_blocking(run_url_handler())
 }

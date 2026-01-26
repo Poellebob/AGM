@@ -59,11 +59,9 @@ async fn unpack_rar(
     reporter: &dyn InstallReporter,
 ) -> io::Result<()> {
     reporter.unpacking_start(file_path.to_str().unwrap(), storage_path.to_str().unwrap());
-    // For simplicity and to avoid complex API integration for unrar, we will just copy the rar file
-    // to the storage path. The user will be informed if they try to "unpack" it.
     let dest_path = storage_path.join(file_path.file_name().unwrap());
     fs::copy(file_path, dest_path)?;
-    reporter.warn(&format!("Warning: .rar files are not automatically unpacked. Please extract '{}' manually if needed.", file_path.display()));
+    reporter.warn(&format!("Warning: .rar files are not automatically unpacked yet. Please extract '{}' manually if needed.", file_path.display()));
     Ok(())
 }
 
@@ -73,11 +71,9 @@ async fn unpack_7z(
     reporter: &dyn InstallReporter,
 ) -> io::Result<()> {
     reporter.unpacking_start(file_path.to_str().unwrap(), storage_path.to_str().unwrap());
-    // For simplicity and to avoid complex API integration for sevenz-rust, we will just copy the 7z file
-    // to the storage path. The user will be informed if they try to "unpack" it.
     let dest_path = storage_path.join(file_path.file_name().unwrap());
     fs::copy(file_path, dest_path)?;
-    reporter.warn(&format!("Warning: .7z files are not automatically unpacked. Please extract '{}' manually if needed.", file_path.display()));
+    reporter.warn(&format!("Warning: .7z files are not automatically unpacked yet. Please extract '{}' manually if needed.", file_path.display()));
     Ok(())
 }
 
