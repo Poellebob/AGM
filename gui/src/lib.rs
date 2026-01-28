@@ -1,4 +1,4 @@
-use iced::widget::{button, column, row, Column};
+use iced::widget::{button, column, Column, row, Row};
 use iced::{Application, Command, Element, Settings, executor};
 
 pub fn run() {
@@ -27,7 +27,7 @@ pub enum Message {
 }
 
 
-fn create_elements(elements: &[String]) -> Column<Message> {
+fn create_column_elements(elements: &[String]) -> Column<Message> {
     let mut area: Column<Message> = column![];
 
     for element in elements {
@@ -40,9 +40,19 @@ fn create_elements(elements: &[String]) -> Column<Message> {
     area
 }
 
-// -----------------------------
-// UI Sections
-// -----------------------------
+fn create_row_elements(elements: &[String]) -> Row<Message> {
+    let mut area: Row<Message> = row![];
+
+    for element in elements {
+        area = area.push(
+            button(element.as_str())
+                .on_press(Message::ButtonPressed(element.clone()))
+        );
+    }
+
+    area
+}
+
 struct Profiles { items: Vec<String> }
 struct Presets { items: Vec<String> }
 struct Mods { items: Vec<String> }
@@ -50,22 +60,22 @@ struct Toolbar { items: Vec<String> }
 
 impl Profiles {
     fn view(&self) -> Element<Message> {
-        create_elements(&self.items).into()
+        create_column_elements(&self.items).into()
     }
 }
 impl Presets {
     fn view(&self) -> Element<Message> {
-        create_elements(&self.items).into()
+        create_column_elements(&self.items).into()
     }
 }
 impl Mods {
     fn view(&self) -> Element<Message> {
-        create_elements(&self.items).into()
+        create_column_elements(&self.items).into()
     }
 }
 impl Toolbar {
     fn view(&self) -> Element<Message> {
-        create_elements(&self.items).into()
+        create_row_elements(&self.items).into()
     }
 }
 
