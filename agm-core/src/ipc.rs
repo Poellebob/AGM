@@ -8,7 +8,10 @@ pub struct UrlMessage {
     pub timestamp: u64,
 }
 use tokio::io::AsyncReadExt;
+#[cfg(unix)]
 use tokio::net::{TcpListener, UnixListener};
+#[cfg(windows)]
+use tokio::net::{TcpListener};
 use tokio::sync::mpsc;
 #[cfg(unix)]
 use std::path::Path;
