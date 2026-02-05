@@ -92,9 +92,9 @@ async fn unpack_tar(
 async fn handle_file(
     file_path: &Path,
     profile: &Profile,
-    reporter: &dyn InstallReporter,
     data_dir: &Path,
     mod_name: &str,
+    reporter: &dyn InstallReporter,
 ) -> io::Result<()> {
     let file_name = file_path
         .file_name()
@@ -209,7 +209,7 @@ pub async fn install_mods(
 
     for file_path_str in files {
         let file_path = PathBuf::from(file_path_str);
-        handle_file(&file_path, &profile, reporter, &data_dir, mod_name).await?;
+        handle_file(&file_path, &profile, &data_dir, mod_name, reporter).await?;
     }
 
     // Add mod to config after successful installation
