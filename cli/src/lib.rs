@@ -316,7 +316,8 @@ impl InstallReporter for CliInstallReporter {
 }
 
 pub fn run(args: Args) {
-    let mut agm = match Agm::new() {
+    let reporter = CliInstallReporter;
+    let mut agm = match Agm::new_with_reporter(Box::new(reporter)) {
         Ok(agm) => agm,
         Err(e) => {
             eprintln!("Error initializing AGM: {}", e);
@@ -334,7 +335,7 @@ pub fn run(args: Args) {
             if let Some(arg) = std::env::args().nth(3) {
                 if let Ok(agm) = Agm::new() {
                     if arg == "profile" || arg == "game" {
-                        for profile in agm.get_profile_names() {
+                        for profile in agm.get_game_names() {
                             println!("{}", profile);
                         }
                         return;
@@ -389,7 +390,7 @@ pub fn run(args: Args) {
             cmd: cli_profile_cmd,
         }) => match cli_profile_cmd {
             CliProfile::List => {
-                let profiles = agm.get_profile_names();
+                let profiles = agm.get_game_names();
                 if profiles.is_empty() {
                     println!("No profiles found.");
                 } else {
@@ -432,8 +433,11 @@ pub fn run(args: Args) {
             }
 
             CliProfile::Remove { game } => {
-                let reporter = CliInstallReporter;
-                if let Ok((remove_presets, remove_mods)) = reporter.confirm_profile_parts_removal()
+                if let Ok((remove_presets, remove_mods)) = agm
+                    .reporter
+                    .as_ref()
+                    .unwrap()
+                    .confirm_profile_parts_removal()
                 {
                     if let Err(e) = agm.remove_profile(&game, remove_presets, remove_mods) {
                         eprintln!("Error removing profile: {}", e);
@@ -478,7 +482,7 @@ pub fn run(args: Args) {
             }
 
             CliPreset::List { profile } => {
-                let presets = agm.get_presets();
+                let presets = agm.get_games();
                 if let Some(game_name) = profile {
                     if let Some(preset_config) = presets.iter().find(|p| p.profile == game_name) {
                         println!("Presets for {}:", game_name);
@@ -603,12 +607,12 @@ pub fn run(args: Args) {
 
         Some(Command::Mod { cmd }) => match cmd {
             CliMod::Install(mut cmd) => {
-                let reporter = CliInstallReporter;
+                let reporter = agm.reporter.as_ref().unwrap();
 
                 let profile_name = match cmd.profile.take() {
                     Some(p) => p,
                     None => {
-                        let profiles = agm.get_profile_names();
+                        let profiles = agm.get_game_names();
                         if profiles.is_empty() {
                             eprintln!("No profiles found. Please add a profile first.");
                             return;
@@ -629,9 +633,7 @@ pub fn run(args: Args) {
                     }
                 };
 
-                if let Err(e) =
-                    agm.install_mods_blocking(&cmd.files, &profile_name, &mod_name, &reporter)
-                {
+                if let Err(e) = agm.install_mods_blocking(&cmd.files, &profile_name, &mod_name) {
                     eprintln!("Error installing mods: {}", e);
                     return;
                 }

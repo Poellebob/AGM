@@ -80,6 +80,7 @@ fn open_in_editor(editor: &str, file_path: &Path, content: Option<&str>) -> Resu
 
 pub struct Agm {
     config: Config,
+    pub reporter: Option<Box<dyn InstallReporter>>,
 }
 
 impl Agm {
@@ -90,7 +91,17 @@ impl Agm {
         // Sync mods from storage on startup
         Self::sync_mods_from_storage(&mut config)?;
         
-        Ok(Self { config })
+        Ok(Self { config, reporter: None })
+    }
+
+    pub fn new_with_reporter(reporter: Box<dyn InstallReporter>) -> Result<Self, Error> {
+        Config::ensure_config_dirs()?;
+        let mut config = Config::load()?;
+        
+        // Sync mods from storage on startup
+        Self::sync_mods_from_storage(&mut config)?;
+        
+        Ok(Self { config, reporter: Some(reporter) })
     }
 
     
@@ -145,9 +156,9 @@ impl Agm {
         files: &[String],
         profile_name: &str,
         mod_name: &str,
-        reporter: &dyn InstallReporter,
     ) -> std::io::Result<()> {
-        core_install_mods(files, profile_name, mod_name, reporter).await
+        let reporter = self.reporter.as_ref().unwrap();
+        core_install_mods(files, profile_name, mod_name, reporter.as_ref()).await
     }
 
     pub fn install_mods_blocking(
@@ -155,9 +166,9 @@ impl Agm {
         files: &[String],
         profile_name: &str,
         mod_name: &str,
-        reporter: &dyn InstallReporter,
     ) -> std::io::Result<()> {
-        async_runtime::run_blocking(core_install_mods(files, profile_name, mod_name, reporter))
+        let reporter = self.reporter.as_ref().unwrap();
+        async_runtime::run_blocking(core_install_mods(files, profile_name, mod_name, reporter.as_ref()))
     }
 
     pub fn activate_mod(&self, game: &str, mod_name: &str) -> Result<Vec<(PathBuf, PathBuf)>, Error> {
@@ -209,8 +220,12 @@ impl Agm {
         self.config.nexus_api_key.as_ref()
     }
 
-    pub fn get_profile_names(&self) -> Vec<String> {
+    pub fn get_game_names(&self) -> Vec<String> {
         self.config.get_profile_names()
+    }
+
+    pub fn get_reporter(&self) -> Option<&dyn InstallReporter> {
+        self.reporter.as_ref().map(|r| r.as_ref())
     }
 
     fn get_profile_by_name(&self, name: &str) -> Result<Option<Profile>, Error> {
@@ -320,7 +335,7 @@ impl Agm {
         Ok(())
     }
 
-    pub fn get_presets(&self) -> &Vec<GameConfig> {
+    pub fn get_games(&self) -> &Vec<GameConfig> {
         &self.config.games
     }
 
